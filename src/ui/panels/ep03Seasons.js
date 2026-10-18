@@ -28,19 +28,18 @@ export function mount(el, ctx) {
   let transition = '';
   let error = '';
 
-  el.innerHTML = `<div class="season-intro"><span class="micro">TIME-DIVISION STORAGE</span><p>当季取用，过季收起。让同一寸空间，在不同月份承担不同的任务。</p></div>
-    <div class="season-empty"><button class="btn full" data-season-example>载入换季示例</button><p class="hint">从新生清单生成季节物品。已有清单会直接沿用。</p></div>
-    <label class="season-tdm"><span><b>时分复用</b><small>TIME-DIVISION MULTIPLEXING</small></span><input type="checkbox" data-season-tdm></label>
+  el.innerHTML = `<div class="season-empty"><button class="btn full" data-season-example>载入换季示例</button></div>
+    <label class="season-tdm"><span><b>时分复用</b></span><input type="checkbox" data-season-tdm></label>
     <div class="season-status" role="status" aria-live="polite"></div>
-    <div class="season-month-card"><div><span class="micro">CURRENT MONTH</span><strong class="season-month-number">09<small>月</small></strong></div><p class="season-month-state"></p></div>
-    <button class="btn full" data-season-play>自动播放一年 / 每月 0.8 秒</button>
-    <div class="section-title">SPACE-TIME SPECTRUM <span>时空占用谱</span></div>
+    <div class="season-month-card"><div><span class="micro">当前月份</span><strong class="season-month-number">09<small>月</small></strong></div><p class="season-month-state"></p></div>
+    <button class="btn full" data-season-play>播放全年</button>
+    <div class="section-title">时空占用谱</div>
     <div class="season-heat-legend"><span class="good">低于 50%</span><span class="watch">50—75%</span><span class="full">75% 以上</span></div>
-    <div class="season-spectrum-viewport"></div><p class="hint">点击色格切换月份并定位分区；白框标示当前月份。</p>
-    <div class="section-title">STORAGE COMPARISON <span>全年对照</span></div><div class="season-comparison"></div>
+    <div class="season-spectrum-viewport"></div><p class="hint">点色格切换月份并定位。</p>
+    <div class="section-title">全年对照</div><div class="season-comparison"></div>
     <div class="season-detail-metrics"></div>
-    <div class="section-title">SEASONAL ORDERS <span class="season-transition"></span></div><div class="season-orders"></div>`;
-  footer.innerHTML = `<div class="season-month-control"><div><span class="micro">MONTH</span><output class="season-month-output mono">09 月</output><span class="season-year-label">本学年</span></div><input class="season-month-slider" type="range" min="0" max="11" step="1" value="0" aria-label="换季月份：九月至次年八月"><div class="season-slider-labels"><span>9 月</span><span>次年 8 月</span></div></div>`;
+    <div class="section-title">换季清单 <span class="season-transition"></span></div><div class="season-orders"></div>`;
+  footer.innerHTML = `<div class="season-month-control"><div><span class="micro">月份</span><output class="season-month-output mono">09 月</output><span class="season-year-label">本学年</span></div><input class="season-month-slider" type="range" min="0" max="11" step="1" value="0" aria-label="换季月份：九月至次年八月"><div class="season-slider-labels"><span>9 月</span><span>次年 8 月</span></div></div>`;
   const toggle = el.querySelector('[data-season-tdm]');
   const playButton = el.querySelector('[data-season-play]');
   const slider = footer.querySelector('.season-month-slider');
@@ -155,7 +154,7 @@ export function mount(el, ctx) {
     const host = el.querySelector('.season-comparison');
     const plan = state.tdmPlan;
     const comparison = plan?.compare;
-    host.innerHTML = comparison ? `<div class="season-compare-grid">${[['on', '开启复用'], ['off', '关闭复用']].map(([key, label]) => `<div class="season-compare-card ${key}${state.tdm === (key === 'on') ? ' current' : ''}"><span>${label}</span><b>${percent(comparison[key].maxFill)}</b><small>全年浅层分区最高占用</small><p><strong class="mono">${comparison[key].overflowMonths}</strong> 个月有物品放不下</p></div>`).join('')}</div>${comparison.on.maxFill === comparison.off.maxFill ? '<p class="hint">全年固定物品也计入峰值，当前两组峰值相同。复用效果可查看下方本月箱内收纳。</p>' : ''}` : '<p class="hint">计算后显示真实的全年开启 / 关闭对照。</p>';
+    host.innerHTML = comparison ? `<div class="season-compare-grid">${[['on', '开启复用'], ['off', '关闭复用']].map(([key, label]) => `<div class="season-compare-card ${key}${state.tdm === (key === 'on') ? ' current' : ''}"><span>${label}</span><b>${percent(comparison[key].maxFill)}</b><small>浅层最高占用</small><p><strong class="mono">${comparison[key].overflowMonths}</strong> 个月有物品放不下</p></div>`).join('')}</div>` : '<p class="hint">待计算</p>';
     const monthly = plan?.byMonth[state.month];
     const detail = el.querySelector('.season-detail-metrics');
     if (!monthly) { detail.innerHTML = ''; return; }
@@ -164,7 +163,7 @@ export function mount(el, ctx) {
     const shallowVolume = Object.values(monthly.placements).filter(placement => seasonal.has(placement.itemId) && shallowZones.has(placement.zoneId)).reduce((sum, placement) => sum + volume(placement.box), 0);
     const inside = Object.values(monthly.placements).filter(placement => placement.zoneId.endsWith('.inside'));
     const insideVolume = inside.reduce((sum, placement) => sum + volume(placement.box), 0);
-    detail.innerHTML = `<div class="season-live-volume"><span>本月季节物品浅层占用 <b class="mono">${shallowVolume.toFixed(1)} L</b></span><span>本月箱内复用 <b class="mono">${insideVolume.toFixed(1)} L / ${inside.length} 件</b></span></div><p class="hint">浅层为手边与起身可及分区；箱内复用按实际放置体积统计。</p>`;
+    detail.innerHTML = `<div class="season-live-volume"><span>本月季节物品浅层占用 <b class="mono">${shallowVolume.toFixed(1)} L</b></span><span>本月箱内复用 <b class="mono">${insideVolume.toFixed(1)} L / ${inside.length} 件</b></span></div>`;
   }
 
   function render(state) {
@@ -175,18 +174,18 @@ export function mount(el, ctx) {
     toggle.checked = state.tdm;
     toggle.disabled = !state.room;
     el.querySelector('.season-empty').hidden = hasItems;
-    el.querySelector('.season-status').textContent = error || (busy ? '计算中 / 正在安排全年收纳…' : !state.room ? '宿舍模板加载中' : !hasItems ? '请先载入示例，或在第一话添加物品。' : `${state.items.length} 件物品 · ${state.tdm ? '时分复用已开启' : '时分复用已关闭'}`);
+    el.querySelector('.season-status').textContent = error || (busy ? '计算中…' : !state.room ? '宿舍模板加载中' : !hasItems ? '载入示例或添加物品。' : `${state.items.length} 件物品`);
     el.querySelector('.season-status').classList.toggle('error', !!error);
     el.querySelector('.season-month-number').innerHTML = `${String(state.month).padStart(2, '0')}<small>月</small>`;
     el.querySelector('.season-month-state').innerHTML = monthly ? `<span>当季 <b>${monthly.active.length}</b> 件</span><span>非当季 <b>${monthly.stored.length}</b> 件</span><span class="${monthly.overflow.length ? 'red' : ''}">滞留 <b>${monthly.overflow.length}</b> 件</span>` : '<span>等待月度计划</span>';
     playButton.disabled = busy || !plan;
-    playButton.textContent = playing ? '停止播放 / 一年巡览中' : '自动播放一年 / 每月 0.8 秒';
+    playButton.textContent = playing ? '停止播放' : '播放全年';
     slider.disabled = busy || !plan;
     slider.value = Math.max(0, MONTHS.indexOf(state.month));
     footer.querySelector('.season-month-output').value = `${String(state.month).padStart(2, '0')} 月`;
     footer.querySelector('.season-year-label').textContent = state.month >= 9 ? '本年' : '次年';
     el.querySelector('.season-transition').textContent = transition;
-    orders.innerHTML = busy ? '<p class="hint">正在生成换季指令…</p>' : steps.length ? `<ol class="season-order-list">${steps.map(step => `<li class="${step.kind}"><button data-season-item="${esc(step.itemId)}"><span class="mono">${String(step.idx + 1).padStart(2, '0')}</span><span>${esc(step.text)}</span></button></li>`).join('')}</ol>` : `<p class="hint">${monthly ? '本次切换无需挪动物品。' : '月度布局就绪后显示换季清单。'}</p>`;
+    orders.innerHTML = busy ? '<p class="hint">正在生成换季指令…</p>' : steps.length ? `<ol class="season-order-list">${steps.map(step => `<li class="${step.kind}"><button data-season-item="${esc(step.itemId)}"><span class="mono">${String(step.idx + 1).padStart(2, '0')}</span><span>${esc(step.text)}</span></button></li>`).join('')}</ol>` : `<p class="hint">${monthly ? '无需调整。' : '暂无指令。'}</p>`;
     renderHeatmap(state);
     renderComparison(state);
   }

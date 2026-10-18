@@ -31,7 +31,6 @@ export async function boot({ planner, scene, ai }) {
         return `<g class="boot-link ${row.ready ? 'linked' : 'standby'}" data-boot-link="${index}"><path class="boot-route" d="M20 ${y}h${88 + index * 25}l28 ${index === 1 ? 0 : index ? -18 : 18}h${132 - index * 25}l25 ${index === 1 ? 0 : index ? 18 : -18}h55"/><rect x="350" y="${y - 6}" width="12" height="12"/><text x="378" y="${y + 4}">${esc(row.code)}</text></g>`;
       }).join('')}</svg><span>模块连线图 / 启动阶段</span></div>
       <div class="boot-progress" role="progressbar" aria-label="启动检查进度" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"><i></i></div><div class="boot-check-count">CHECKS <span>0 / 5</span></div>
-      <p class="boot-module-note">连线表示模块已加载；联网导入能力进入界面后检测。</p>
     </section><div class="boot-bottom"><span>CM / Y↑ <i>空间有限，安排由你。</i></span><button class="btn compact">点击或按任意键跳过 <b>↗</b></button></div>`;
   document.body.append(overlay);
   await new Promise(resolve => {

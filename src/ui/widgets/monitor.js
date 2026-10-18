@@ -1,4 +1,5 @@
 import { esc } from '../helpers.js';
+import { renderTribunalBoard } from './tribunal.js';
 import '../../styles/monitor.css';
 
 const voteLabels = [['time', '时', 'TIME'], ['space', '空', 'SPACE'], ['mind', '心', 'MIND']];
@@ -37,13 +38,15 @@ export function sparkline(history = []) {
  */
 export function mountMonitor(el, { store, planner }) {
   el.innerHTML = `
+    <div class="monitor-overview" aria-label="空间状态总览">
     <section class="panel monitor-sync"><div class="panel-head"><b>同步率</b><span>SYNC</span></div><div class="panel-body">
       <div class="monitor-gauge" data-tone="standby"><svg class="monitor-sync-orbit" viewBox="0 0 288 162" aria-hidden="true"><path class="monitor-sync-orbit-guide" d="M7 131 A117 117 0 0 1 240 78"/><path class="monitor-sync-orbit-track" d="M21 130 A103 103 0 0 1 226 81"/><path class="monitor-sync-orbit-fill" pathLength="100" d="M21 130 A103 103 0 0 1 226 81"/><path class="monitor-sync-orbit-cut" d="M241 75 L254 63 L276 63 M251 124 L275 100"/></svg><div class="monitor-sync-readout"><span class="monitor-sync-value">—</span><span class="monitor-sync-unit">%</span></div><span class="monitor-sync-caption">等待规划</span></div>
       <div class="monitor-history"></div><div class="monitor-chart-caption"><span>0—100%</span><span class="monitor-history-count">0 次记录</span></div>
     </div></section>
     <section class="panel monitor-tribunal"><div class="panel-head"><b>三审决议</b><span>03</span></div><div class="panel-body" data-tribunal></div></section>
+    </div><div class="monitor-inspectors">
     <details class="panel monitor-zones monitor-fold"><summary class="panel-head"><b>分区状态</b><span class="monitor-zone-count">00</span></summary><div class="monitor-zone-summary"></div><div class="monitor-zone-list" aria-label="分区状态列表"></div></details>
-    <details class="panel monitor-alerts monitor-fold" open><summary class="panel-head"><b>警报</b><span class="monitor-alert-count">00</span></summary><ol class="monitor-alert-list" aria-live="polite" aria-relevant="additions text"></ol></details>`;
+    <details class="panel monitor-alerts monitor-fold" open><summary class="panel-head"><b>警报</b><span class="monitor-alert-count">00</span></summary><ol class="monitor-alert-list" aria-live="polite" aria-relevant="additions text"></ol></details></div>`;
 
   const gauge = el.querySelector('.monitor-gauge');
   const value = el.querySelector('.monitor-sync-value');
@@ -108,13 +111,7 @@ export function mountMonitor(el, { store, planner }) {
     const notes = Array.isArray(sync?.notes) ? sync.notes : [];
     const allApproved = assessed && voteLabels.every(([key]) => sync.votes[key] === true);
     const approvals = assessed ? voteLabels.filter(([key]) => sync.votes[key] === true).length : null;
-    tribunal.innerHTML = `<div class="monitor-votes">${voteLabels.map(([key, zh, en], index) => {
-      const vote = assessed ? sync.votes[key] : undefined;
-      const status = vote === true ? 'approved' : vote === false ? 'denied' : 'pending';
-      const text = vote === true ? '承认' : vote === false ? '否决' : '待审';
-      const note = notes.length ? notes.join('\n') : assessed ? '本次评估未报告待解决事项。' : '完成首次规划后生成评估。';
-      return `<div class="monitor-vote ${status}" data-axis="${key}" tabindex="0" title="${esc(note)}" aria-label="${zh} ${en}：${text}。${esc(note)}"><span><i>0${index + 1}</i>${zh}<small>${en}</small></span><strong>${text}</strong></div>`;
-    }).join('')}</div><div class="monitor-verdict ${allApproved ? 'approved' : assessed ? 'denied' : 'pending'}"><span>${allApproved ? '全员承认 · 执行' : assessed ? '审议未通过' : '等待首次规划'}</span><b>${approvals === null ? '—' : approvals}<small>/3</small></b></div>${notes.length ? `<details class="monitor-note"><summary>审议依据</summary><p class="monitor-vote-notes">${esc(notes.join(' / '))}</p></details>` : ''}`;
+    tribunal.innerHTML = `${renderTribunalBoard(sync)}<div class="monitor-verdict ${allApproved ? 'approved' : assessed ? 'denied' : 'pending'}"><span>${allApproved ? '三审通过' : assessed ? '审议未通过' : '等待规划'}</span><b>${approvals === null ? '—' : approvals}<small>/3</small></b></div>${notes.length ? `<details class="monitor-note"><summary>审议依据</summary><p class="monitor-vote-notes">${esc(notes.join(' / '))}</p></details>` : ''}`;
   }
 
   function renderZones(s) {

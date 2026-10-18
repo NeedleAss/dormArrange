@@ -58,8 +58,8 @@ const panels = { EP00: modelPanel, EP01: moveInPanel, EP02: focusPanel, EP03: se
 function render() {
   activePanel?.unmount();
   const ep = EPISODES.find(e => e.id === store.get().episode);
-  shell.panel.innerHTML = panelHeading(ep) + '<div id="episode-panel"></div>';
-  shell.footer.innerHTML = '<span class="muted">从丈量一间宿舍开始。</span>';
+  shell.panel.innerHTML = panelHeading(ep) + '<div id="episode-panel" class="module-surface"></div>';
+  shell.footer.innerHTML = '';
   activePanel = panels[ep.id];
   activePanel?.mount(shell.panel.querySelector('#episode-panel'), ctx);
 }
@@ -82,7 +82,7 @@ document.addEventListener('keydown', event => {
 });
 store.subscribe(render, ['episode']); render();
 mountMonitor(shell.monitor, ctx);
-alert(planner ? '宿舍模板已载入，尺寸单位 cm。' : '规划模块加载中。');
+if (!planner) alert('规划模块加载中。');
 await boot({ planner, scene, ai });
 ctx.navigate = navigate;
 ctx.refreshPanel = render;

@@ -29,16 +29,16 @@ export function mount(el, ctx) {
   // 待机演示使用内存预览集合，不覆盖用户已保存的快照或累计时长。
   const snapshotsOf = (state = store.get()) => ctx.previewSnapshots || state.snapshots || [];
 
-  el.innerHTML = `<div class="growth-summary" aria-label="当前布局统计"><div><span>FOCUS / 累计专注</span><strong class="growth-minutes mono">0<small>min</small></strong></div><div><span>ITEMS / 当前物品</span><strong class="growth-items mono">0<small>件</small></strong></div></div>
-    <div class="section-title">LAYOUT ARCHIVE <span>保存这一刻</span></div>
+  el.innerHTML = `<div class="growth-summary" aria-label="当前布局统计"><div><span>累计专注</span><strong class="growth-minutes mono">0<small>min</small></strong></div><div><span>当前物品</span><strong class="growth-items mono">0<small>件</small></strong></div></div>
+    <div class="section-title">保存快照</div>
     <form class="growth-save-form"><label>快照名称<input name="label" type="text" maxlength="48" required placeholder="例如：大一上 · 入住" autocomplete="off"></label><label>学期<select name="semester">${semesters.map(semester => `<option value="${semester.code}">${semester.label}</option>`).join('')}</select></label><button class="btn btn-primary full" type="submit">保存当前快照</button></form>
-    <p class="hint">快照记录此刻的布局、同步率和专注时长。点击历史节点，会载入当时的数据。</p>
+    <p class="hint">点历史节点载入当时的布局与时长。</p>
     <div class="button-row"><button class="btn compact" type="button" data-growth-preset>载入成长示例</button><button class="btn compact" type="button" data-growth-replay>回放</button></div>
-    <div class="growth-current" aria-live="polite"><span class="micro">LIVE LAYOUT</span><strong>当前布局</strong><small>保存每次调整，留下空间变化的轨迹。</small></div>
-    <div class="section-title">SYNC HISTORY <span>同步率变化</span></div><div class="growth-chart"></div><div class="growth-chart-caption"><span>0—100%</span><span class="growth-record-count">0 个快照</span></div>
-    <div class="section-title">SAVED MOMENTS <span>历史快照</span></div><div class="growth-records"></div>
-    <div class="section-title">NEXT SEMESTER <span>成长预测</span></div><button class="btn full" type="button" data-growth-forecast>查看未来收纳需求</button><p class="hint growth-forecast">根据物品库中的增长速度，估算后续学期的收纳压力。</p>`;
-  footer.innerHTML = '<span class="micro growth-footer-label">LAYOUT<br>ARCHIVE</span><div class="growth-timeline" aria-label="布局快照时间轴"></div>';
+    <div class="growth-current" aria-live="polite"><strong>当前布局</strong></div>
+    <div class="section-title">同步率变化</div><div class="growth-chart"></div><div class="growth-chart-caption"><span>0—100%</span><span class="growth-record-count">0 个快照</span></div>
+    <div class="section-title">历史快照</div><div class="growth-records"></div>
+    <div class="section-title">成长预测</div><button class="btn full" type="button" data-growth-forecast>查看未来收纳需求</button><p class="hint growth-forecast"></p>`;
+  footer.innerHTML = '<span class="micro growth-footer-label">快照</span><div class="growth-timeline" aria-label="布局快照时间轴"></div>';
   const form = el.querySelector('.growth-save-form');
   const nameInput = form.elements.label;
   const semesterInput = form.elements.semester;
@@ -133,7 +133,7 @@ export function mount(el, ctx) {
     // 再次载入示例只替换同 ID 的示例记录，保留用户自己保存的快照。
     const snapshots = [...store.get().snapshots.filter(snapshot => !presetIds.has(snapshot.id)), ...clone(presets)];
     store.set({ snapshots });
-    if (loadSnapshot(presets[0].id)) ctx.alert(`已载入 ${presets.length} 个成长快照，点击底栏节点查看变化。`, 'success');
+    if (loadSnapshot(presets[0].id)) ctx.alert(`已载入 ${presets.length} 个成长快照。`, 'success');
   }
 
   function replayNext() {
@@ -195,10 +195,10 @@ export function mount(el, ctx) {
     presetButton.disabled = !presets.length || !!state.timer?.running;
     replayButton.disabled = snapshots.length < 2 || !!state.timer?.running;
     replayButton.textContent = playing ? '停止回放' : '回放';
-    records.innerHTML = snapshots.length ? snapshots.map(snapshot => `<button class="growth-record${snapshot.id === selectedId ? ' active' : ''}" type="button" data-snapshot="${esc(snapshot.id)}" aria-pressed="${snapshot.id === selectedId}"${state.timer?.running ? ' disabled' : ''}><span class="growth-record-label"><strong>${esc(snapshot.label)}</strong><small>${esc(semesterLabel(snapshot.semester))} · ${snapshot.items.length} 件物品 · ${snapshot.focusMinutes} min</small></span><span class="growth-record-sync mono">${snapshot.sync}<small>%</small></span></button>`).join('') : '<p class="empty">还没有快照。保存此刻的布局，或载入成长示例。</p>';
-    timeline.innerHTML = snapshots.length ? snapshots.map(snapshot => `<button class="growth-node${snapshot.id === selectedId ? ' active' : ''}" type="button" data-snapshot="${esc(snapshot.id)}" title="${esc(snapshot.label)}" aria-label="${esc(snapshot.label)}，同步率 ${snapshot.sync}%，${esc(semesterLabel(snapshot.semester))}" aria-pressed="${snapshot.id === selectedId}"${state.timer?.running ? ' disabled' : ''}><span class="growth-node-sync mono">${snapshot.sync}%</span><i aria-hidden="true"></i><span class="growth-node-semester">${esc(semesterLabel(snapshot.semester))}</span></button>`).join('') : '<span class="hint growth-timeline-empty">尚无档案节点</span>';
+    records.innerHTML = snapshots.length ? snapshots.map(snapshot => `<button class="growth-record${snapshot.id === selectedId ? ' active' : ''}" type="button" data-snapshot="${esc(snapshot.id)}" aria-pressed="${snapshot.id === selectedId}"${state.timer?.running ? ' disabled' : ''}><span class="growth-record-label"><strong>${esc(snapshot.label)}</strong><small>${esc(semesterLabel(snapshot.semester))} · ${snapshot.items.length} 件物品 · ${snapshot.focusMinutes} min</small></span><span class="growth-record-sync mono">${snapshot.sync}<small>%</small></span></button>`).join('') : '<p class="empty">暂无快照。</p>';
+    timeline.innerHTML = snapshots.length ? snapshots.map(snapshot => `<button class="growth-node${snapshot.id === selectedId ? ' active' : ''}" type="button" data-snapshot="${esc(snapshot.id)}" title="${esc(snapshot.label)}" aria-label="${esc(snapshot.label)}，同步率 ${snapshot.sync}%，${esc(semesterLabel(snapshot.semester))}" aria-pressed="${snapshot.id === selectedId}"${state.timer?.running ? ' disabled' : ''}><span class="growth-node-sync mono">${snapshot.sync}%</span><i aria-hidden="true"></i><span class="growth-node-semester">${esc(semesterLabel(snapshot.semester))}</span></button>`).join('') : '<span class="hint growth-timeline-empty">暂无快照</span>';
     current.classList.toggle('playing', playing);
-    current.innerHTML = selected ? `<span class="micro">${playing ? 'REPLAY / ' : 'ARCHIVE / '}${esc(semesterLabel(selected.semester))}</span><strong>${esc(selected.label)}</strong><small>${selected.items.length} 件物品 · 快照同步率 ${selected.sync}%</small>` : '<span class="micro">LIVE LAYOUT</span><strong>当前布局</strong><small>保存每次调整，留下空间变化的轨迹。</small>';
+    current.innerHTML = selected ? `<span class="micro">${playing ? '回放 / ' : ''}${esc(semesterLabel(selected.semester))}</span><strong>${esc(selected.label)}</strong><small>${selected.items.length} 件物品 · 快照同步率 ${selected.sync}%</small>` : '<strong>当前布局</strong>';
     if (focusId) [...focusHost.querySelectorAll('[data-snapshot]')].find(button => button.dataset.snapshot === focusId)?.focus({ preventScroll: true });
   }
 
@@ -206,7 +206,7 @@ export function mount(el, ctx) {
     renderStats(state);
     if (changed.some(key => ['snapshots', 'items', 'room', 'focusMinutes', 'timer'].includes(key))) renderRecords(state);
     if (changed.some(key => ['items', 'room', 'owner'].includes(key))) {
-      forecast.textContent = '布局已变化，可重新查看未来学期的收纳需求。';
+      forecast.textContent = '';
       forecast.classList.remove('growth-warning');
     }
     if (state.timer?.running && playing) stopPlayback();
