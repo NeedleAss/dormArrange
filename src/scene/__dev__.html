@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>方寸 · A 车道独立测试台</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Microsoft YaHei", system-ui, sans-serif; background: #050506; color: #e9e1d4; }
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100dvh; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+    header { position: relative; z-index: 2; padding: 10px 14px; border-bottom: 1px solid #ff9a1f88; background: #0b0b0e; }
+    h1 { display: inline; margin: 0 16px 0 0; font-size: 17px; color: #ff9a1f; }
+    .meta, footer { font-family: ui-monospace, monospace; font-size: 12px; }
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+    button, select, input { font: inherit; font-size: 12px; padding: 5px 8px; color: #ff9a1f; border: 1px solid #ff9a1f88; border-radius: 0; background: #15151a; }
+    button { cursor: pointer; }
+    button:hover, button:focus-visible { background: #ff9a1f; color: #050506; }
+    button.danger { border-color: #e5161c; }
+    input { width: 48px; }
+    .divider { align-self: stretch; border-left: 1px solid #ff9a1f44; margin: 0 4px; }
+    #scene { position: relative; min-height: 0; overflow: hidden; }
+    footer { display: flex; gap: 16px; flex-wrap: wrap; padding: 8px 14px; border-top: 1px solid #ff9a1f88; background: #0b0b0e; }
+    #message { flex: 1; min-width: 260px; color: #39ff7a; white-space: pre-wrap; }
+    #errors { color: #e5161c; }
+    #selection, #hover { color: #2ee6ff; }
+    dialog { max-width: 90vw; background: #0b0b0e; border: 1px solid #ff9a1f; color: #e9e1d4; }
+    dialog img { display: block; max-width: 85vw; max-height: 75vh; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>方寸 / A 车道测试台</h1><span class="meta" id="source-label">数据载入中</span>
+    <div class="controls" aria-label="场景测试操作">
+      <select id="source" aria-label="测试数据来源"><option value="planner">真实宿舍（失败回退）</option><option value="mock">契约示例 MOCK</option></select>
+      <button data-action="room">加载房间</button><button data-action="items">加载物品</button><button data-action="forty">40 件压力测试</button>
+      <button data-action="move">移动 / 尺寸补间</button><button data-action="remove">删除末件</button><button data-action="states">轮换物品状态</button>
+      <button data-action="zones">分区状态</button><button data-action="zonesOff">隐藏分区</button>
+      <span class="divider"></span><button data-action="field">展开力场</button><button data-action="clear">力场净空</button><button data-action="fieldOff">清除力场</button>
+      <button data-action="tolerance">容差盒</button><button data-action="toleranceOff">清除容差</button>
+      <span class="divider"></span><button data-action="play">播放示例步骤</button><button data-action="pause">暂停</button><button data-action="resume">继续</button>
+      <input id="step-index" type="number" min="0" value="0" aria-label="跳转步骤索引" /><button data-action="seek">跳至该步完成</button><button data-action="stop">停止</button>
+      <span class="divider"></span><button data-action="orbit">斜俯视</button><button data-action="top">俯视蓝图</button><button data-action="seat">座位视角</button>
+      <select id="owner" aria-label="座位归属"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+      <button data-action="focus">聚焦选中 / 首件</button><button data-action="focusZone">聚焦书桌</button><button data-action="bloom">发光开关</button><button data-action="snapshot">截图</button>
+      <button data-action="checks">API 验收</button><button class="danger" data-action="recreate">释放并重建</button>
+    </div>
+  </header>
+  <main id="scene" aria-label="三维场景画布"></main>
+  <footer><span id="message" role="status">启动中…</span><span id="selection">选择：无</span><span id="hover">悬停：无</span><span id="errors">错误：0</span></footer>
+  <dialog id="snapshot-preview"><img alt="当前场景截图" /><form method="dialog"><button>关闭预览</button></form></dialog>
+  <script type="module" src="./__dev__.js"></script>
+</body>
+</html>
