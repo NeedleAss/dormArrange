@@ -10,8 +10,8 @@ export const EPISODES = [
   { id: 'EP04', no: '第四话', title: '成长', en: 'GROWTH', desc: '每一寸变化，都有迹可循。' }
 ];
 
-export function syncPatch(ctx, placements, label, extra = {}) {
+export function syncPatch(ctx, placements, label, extra = {}, items = ctx.store.get().items) {
   const s = ctx.store.get();
-  const sync = ctx.planner.computeSync(s.room, s.items, placements, { owner: s.owner, ...extra });
+  const sync = ctx.planner.computeSync(s.room, items, placements, { owner: s.owner, ...extra });
   return { sync, syncHistory: [...s.syncHistory, { t: new Date().toISOString(), total: sync.total, label }].slice(-60) };
 }

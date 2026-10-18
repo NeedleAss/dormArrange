@@ -40,8 +40,9 @@ export function mount(el, ctx) {
     plan.steps.slice(0,upto).forEach(step => { itemStates[step.itemId] = step.kind === 'dispose' ? 'stored' : 'moved'; });
     if (upto === plan.steps.length) {
       store.set({ items, placements: plan.placementsAfter, stepIndex: upto, itemStates,
-        ...syncPatch(ctx, plan.placementsAfter, '腾桌完成', { focusBox: plan.focusBox, moves: plan.steps.length }) });
-    } else store.set({ items, placements, stepIndex: upto, itemStates });
+        ...syncPatch(ctx, plan.placementsAfter, '腾桌完成', { focusBox: plan.focusBox, moves: plan.steps.length }, items) });
+    } else store.set({ items, placements, stepIndex: upto, itemStates,
+      ...syncPatch(ctx, placements, '腾桌进度', { focusBox: plan.focusBox, moves: upto }, items) });
   }
   function finish(plan) {
     if (!active || store.get().movePlan !== plan) return;
@@ -71,9 +72,11 @@ export function mount(el, ctx) {
       const tick = () => {
         if (!active || paused) return;
         index++;
-        store.set({ placements: planner.applySteps(starts.get(plan) || s.placements, plan.steps, index), stepIndex: index });
         if (index >= plan.steps.length) finish(plan);
-        else fallbackTimer = setTimeout(tick, 900);
+        else {
+          store.set({ placements: planner.applySteps(starts.get(plan) || s.placements, plan.steps, index), stepIndex: index });
+          fallbackTimer = setTimeout(tick, 900);
+        }
       };
       fallbackTimer = setTimeout(tick, 900);
     }
@@ -108,7 +111,8 @@ export function mount(el, ctx) {
       starts.set(plan, clone(s.placements));
       startItems.set(plan, s.items);
       const itemStates = Object.fromEntries(s.items.map(item => [item.id, plan.conflicts.includes(item.id) ? 'conflict' : 'fits']));
-      store.set({ movePlan: plan, stepIndex: 0, itemStates, ...syncPatch(ctx, plan.placementsAfter, '腾桌预判', { focusBox: plan.focusBox, moves: plan.steps.length }) });
+      // 展开只展示预测，当前同步率仍由尚未移动的物品位置计算。
+      store.set({ movePlan: plan, stepIndex: 0, itemStates, ...syncPatch(ctx, s.placements, '腾桌展开', { focusBox: plan.focusBox, moves: 0 }) });
       ctx.alert(plan.conflicts.length ? `专注区检测到 ${plan.conflicts.length} 件冲突物品，生成 ${plan.steps.length} 步指令。` : '专注区已经净空。', plan.conflicts.length ? 'warning' : 'success');
     } catch { ctx.alert('暂时无法生成作战指令，请检查桌面尺寸。', 'error'); }
   };
@@ -128,7 +132,7 @@ export function mount(el, ctx) {
     el.querySelectorAll('[data-focus-size]').forEach(button => button.classList.toggle('active', button.dataset.focusSize === `${s.focusSpec.w},${s.focusSpec.d}`));
     el.querySelector('#deploy').disabled = !s.items.length || !Object.keys(s.placements).length;
     el.querySelector('#start-focus').disabled = !plan || s.stepIndex < plan.steps.length || plan.unresolved.length > 0 || s.sync?.parts.focus !== 1;
-    el.querySelector('#orders').innerHTML = plan ? `<div class="section-title">OPERATION ORDERS <span>${plan.steps.length} 步</span></div><div class="plan-metrics"><span><b>${plan.metrics.moves}</b> 件移动</span><span>约 <b>${Math.round(plan.metrics.estSeconds)}</b> 秒</span><span><b>${(plan.metrics.clearedArea / 10000).toFixed(2)}</b> ㎡</span></div>${plan.steps.length ? `<ol class="order-list">${plan.steps.map((step,i) => `<li class="${i < s.stepIndex ? 'done' : i === s.stepIndex ? 'current' : ''}"><button data-step="${i+1}"><span class="mono">${String(i+1).padStart(2,'0')}</span>${esc(step.text)}</button></li>`).join('')}</ol><div class="button-row"><button class="btn compact btn-primary" id="play-orders">${playing && !paused ? '暂停' : paused ? '继续' : s.stepIndex === plan.steps.length ? '重放' : '执行指令'}</button><button class="btn compact" id="step-order" ${s.stepIndex >= plan.steps.length ? 'disabled' : ''}>单步</button><button class="btn compact" id="reset-orders">复位</button></div>` : '<p class="green hint">专注区已经净空。</p>'}${plan.unresolved.map(entry => `<div class="unresolved"><b>${esc(s.items.find(i => i.id === entry.itemId)?.name || '待处理物品')}</b><p>${esc(entry.reason)}</p><p>${esc(entry.suggestion)}</p></div>`).join('')}` : '<p class="empty">展开力场，生成最少移动指令。</p>';
+    el.querySelector('#orders').innerHTML = plan ? `<div class="section-title">OPERATION ORDERS <span>${plan.steps.length} 步</span></div><div class="plan-metrics"><span><b>${plan.metrics.moves}</b> 件移动</span><span>约 <b>${Math.round(plan.metrics.estSeconds)}</b> 秒</span><span><b>${(plan.metrics.clearedArea / 10000).toFixed(2)}</b> ㎡</span></div><p class="hint" id="focus-prediction">执行后预计 <b class="mono">${Math.round(plan.metrics.syncAfter)}%</b></p>${plan.steps.length ? `<ol class="order-list">${plan.steps.map((step,i) => `<li class="${i < s.stepIndex ? 'done' : i === s.stepIndex ? 'current' : ''}"><button data-step="${i+1}"><span class="mono">${String(i+1).padStart(2,'0')}</span>${esc(step.text)}</button></li>`).join('')}</ol><div class="button-row"><button class="btn compact btn-primary" id="play-orders">${playing && !paused ? '暂停' : paused ? '继续' : s.stepIndex === plan.steps.length ? '重放' : '执行指令'}</button><button class="btn compact" id="step-order" ${s.stepIndex >= plan.steps.length ? 'disabled' : ''}>单步</button><button class="btn compact" id="reset-orders">复位</button></div>` : '<p class="green hint">专注区已经净空。</p>'}${plan.unresolved.map(entry => `<div class="unresolved"><b>${esc(s.items.find(i => i.id === entry.itemId)?.name || '待处理物品')}</b><p>${esc(entry.reason)}</p><p>${esc(entry.suggestion)}</p></div>`).join('')}` : '<p class="empty">展开力场，生成最少移动指令。</p>';
     const slider = ctx.footer.querySelector('#step-slider');
     if (slider) { slider.max = plan?.steps.length || 0; slider.value = s.stepIndex; slider.disabled = !plan?.steps.length; ctx.footer.querySelector('#step-count').textContent = `${s.stepIndex} / ${plan?.steps.length || 0}`; }
   }
