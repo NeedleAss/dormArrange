@@ -94,7 +94,9 @@ export function createCameraRig({ container, domElement, onCameraChange }) {
   function readState() {
     target.copy(controls.target);
     return { position: camera.position.clone(), target: target.clone(), up: camera.up.clone(),
-      quaternion: camera.quaternion.clone(), fov: perspective.fov, halfHeight };
+      quaternion: camera.quaternion.clone(), fov: perspective.fov,
+      // 滚轮改变正交相机 zoom，切换起点必须保存实际可见画幅。
+      halfHeight: camera.isOrthographicCamera ? halfHeight / camera.zoom : halfHeight };
   }
 
   function applyState(state) {
@@ -123,7 +125,7 @@ export function createCameraRig({ container, domElement, onCameraChange }) {
       if (nextCamera.isOrthographicCamera) {
         start.halfHeight = Math.max(1, distance * Math.tan(MathUtils.degToRad(start.fov / 2)));
       } else {
-        start.fov = MathUtils.clamp(MathUtils.radToDeg(2 * Math.atan(halfHeight / Math.max(1, distance))), 5, 120);
+        start.fov = MathUtils.clamp(MathUtils.radToDeg(2 * Math.atan(start.halfHeight / Math.max(1, distance))), 5, 120);
       }
       camera = nextCamera;
     }

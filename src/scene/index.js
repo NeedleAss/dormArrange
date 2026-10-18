@@ -234,8 +234,9 @@ export function createScene(container, { onSelect, onHover } = {}) {
     room = nextRoom || null;
     clearHover();
     roomView.setRoom(room);
-    if (room?.bounds) { rebuildGrid(room.bounds); cameraRig.setRoom(room, { immediate: !hadRoom }); }
-    else { rebuildGrid(); clearHover(); }
+    cameraRig.setRoom(room, { immediate: !hadRoom });
+    if (room?.bounds) rebuildGrid(room.bounds);
+    else rebuildGrid();
   }
 
   function setItems(nextItems, placements = {}, { animate = true, overflowIds = [] } = {}) {
