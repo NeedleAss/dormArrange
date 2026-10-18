@@ -60,6 +60,7 @@ export default defineConfig(({ mode }) => {
             proxy.on('proxyReq', (req) => {
               req.setHeader('Authorization', `Bearer ${AI_API_KEY}`);
               req.removeHeader('cookie');
+              req.setHeader('Accept-Encoding', 'identity');
             });
             proxy.on('proxyRes', (upstreamRes, _req, res) => {
               const status = upstreamRes.statusCode ?? 502;
@@ -69,7 +70,10 @@ export default defineConfig(({ mode }) => {
                 return reply(res, status >= 400 && status < 500 ? status : 502,
                   { code: status >= 400 && status < 500 ? 'HTTP_4XX' : 'HTTP_5XX' });
               }
-              res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+              const encoding = upstreamRes.headers['content-encoding'];
+              res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store',
+                ...(['gzip', 'br', 'deflate'].includes(encoding) ? { 'Content-Encoding': encoding } : {}),
+              });
               upstreamRes.on('error', () => res.destroy());
               upstreamRes.pipe(res);
             });

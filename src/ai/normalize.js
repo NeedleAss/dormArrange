@@ -169,7 +169,16 @@ export function normalizeItems(rawText, { owner = 'A', text = '', photo = false 
     const explicitPower = evidence.match(/(\d+(?:\.\d+)?)\s*(?:w|瓦)/i);
     const power = explicitPower ? Number(explicitPower[1]) : entry.power_w;
     const powerW = typeof power === 'number' && Number.isFinite(power) && power >= 0 ? power : null;
-    const note = typeof entry.note === 'string' ? entry.note.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 400) : '';
+    let note = typeof entry.note === 'string' ? entry.note.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 400) : '';
+    if (photo) {
+      const horizontal = { left: '左侧', center: '中间', right: '右侧' };
+      const depth = { front: '前方', back: '后方' };
+      const hint = entry.position_hint;
+      // 位置只写入契约已有的 note，不把未校验字段或假坐标传给规划器。
+      const parts = [typeof hint?.horizontal === 'string' && Object.hasOwn(horizontal, hint.horizontal) ? horizontal[hint.horizontal] : '',
+        typeof hint?.depth === 'string' && Object.hasOwn(depth, hint.depth) ? depth[hint.depth] : ''].filter(Boolean);
+      if (parts.length) note = `照片位置：${parts.join('、')}；${note}`.slice(0, 400);
+    }
     if (!CATEGORIES.has(entry.category) || !FREQUENCIES.has(entry.freq)) warnings.add('部分物品分类或使用频率已使用默认值。');
     if (confidence === 'unknown') warnings.add('部分物品尺寸待确认，请测量后校准。');
     if (qty !== entry.qty) warnings.add('部分物品数量已修正为1至50的整数。');

@@ -1,7 +1,8 @@
 import { chat, getConfig } from './client.js';
 import { parseItemsText } from '../planner/index.js';
-import { makeItemMessages } from './prompts.js';
+import { makeItemMessages, PHOTO_SYSTEM_PROMPT } from './prompts.js';
 import { normalizeItems } from './normalize.js';
+import { compressPhoto } from './photo.js';
 
 const OFFLINE_WARNING = 'AI 离线，已使用本地解析';
 const SAFE_CODES = new Set(['DISABLED', 'TIMEOUT', 'HTTP_4XX', 'HTTP_5XX', 'BAD_JSON', 'EMPTY_RESULT']);
@@ -48,9 +49,25 @@ export async function aiParseItems(text, options = {}) {
   }
 }
 
-/** 照片加分项尚未启用时，调用方可直接置灰。 */
-export async function aiParsePhoto() {
-  return { items: [], source: 'unavailable', warnings: ['当前模型不支持图片'] };
+/**
+ * 仅在主动调用且模型支持视觉时压缩、上传图片；照片不持久化也不缓存。
+ * @param {File} file
+ * @param {{owner?:import('../core/types.js').Owner}} [options]
+ */
+export async function aiParsePhoto(file, options = {}) {
+  try {
+    const config = await getConfig();
+    if (!config.enabled || !config.vision) return { items: [], source: 'unavailable', warnings: ['当前模型不支持图片'] };
+    const image = await compressPhoto(file);
+    const raw = await chat([{ role: 'system', content: PHOTO_SYSTEM_PROMPT },
+      { role: 'user', content: '请提取照片中清晰可见的宿舍物品，以约定 JSON 格式返回。' }], { images: [image] });
+    const { items, warnings } = normalizeItems(raw, { owner: itemOwner(options), photo: true });
+    if (!items.length) return { items: [], source: 'unavailable', warnings: ['没有识别到物品，请换一张清晰照片或输入文字。'] };
+    return { items, source: 'ai', warnings };
+  } catch (error) {
+    const reason = error?.code === 'BAD_IMAGE' ? 'BAD_IMAGE' : SAFE_CODES.has(error?.code) ? error.code : 'HTTP_5XX';
+    return { items: [], source: 'unavailable', warnings: ['照片解析暂不可用，请改用文字清单。', reason] };
+  }
 }
 
 /** 解说为可选功能，UI 可继续使用规划器已有步骤文案。 */

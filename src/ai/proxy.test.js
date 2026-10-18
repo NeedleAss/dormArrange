@@ -6,6 +6,7 @@ import { createServer as createHttpServer, request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 
 const isolatedFlag = '--fangcun-proxy-isolated';
 
@@ -125,6 +126,7 @@ if (!process.argv.includes(isolatedFlag)) {
   test('未配置时仅返回四个安全配置字段，并禁用代理', async (t) => {
     const { config, port } = await startVite(t);
     assert.deepEqual(config.server.proxy, {});
+    assert.deepEqual(config.preview?.proxy, {});
     const response = await call(port, '/ai/__config');
     assert.equal(response.status, 200);
     assert.deepEqual(JSON.parse(response.text), { enabled: false, model: '', wire: 'chat', vision: false });
@@ -136,7 +138,9 @@ if (!process.argv.includes(isolatedFlag)) {
 
   test('两种协议都正确重写基础路径，凭据仅发送给上游', async (t) => {
     const upstream = await startUpstream(t);
-    const { port } = await startVite(t, enabledEnv(upstream.port));
+    const { port, config } = await startVite(t, enabledEnv(upstream.port));
+    // preview 默认会继承 server.proxy，必须明确清空，避免绕过开发中间件。
+    assert.deepEqual(config.preview?.proxy, {});
     const configResponse = await call(port, '/ai/__config');
     assert.deepEqual(JSON.parse(configResponse.text), {
       enabled: true, model: 'synthetic-model', wire: 'chat', vision: true,
@@ -196,6 +200,19 @@ if (!process.argv.includes(isolatedFlag)) {
     assert.equal(result.status, 200);
     assert.equal(result.headers['set-cookie'], undefined);
     assert.equal(result.headers['x-upstream-debug'], undefined);
+  });
+
+  test('上游忽略 identity 仍返回 gzip 时，浏览器能正确解压 JSON', async (t) => {
+    const upstream = await startUpstream(t, (_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' });
+      res.end(gzipSync('{"ok":true}'));
+    });
+    const { port } = await startVite(t, enabledEnv(upstream.port));
+    const response = await fetch(`http://127.0.0.1:${port}/ai/v1/responses`, { method: 'POST' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+    assert.equal(upstream.requests.length, 1);
+    assert.equal(upstream.requests[0].headers['accept-encoding'] === 'identity', true);
   });
 
   test('连接失败只返回固定错误且日志不含合成凭据', async (t) => {

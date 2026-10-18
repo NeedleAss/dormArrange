@@ -37,7 +37,7 @@
 
 ## D3 照片导入（加分）
 
-- [ ] `aiParsePhoto(file, { owner })`：
+- [x] `aiParsePhoto(file, { owner })`：
   - 用 canvas 把图片压缩到长边 1024，转成 JPEG base64
   - 发给视觉模型，输出格式和 D2 一样
   - `vision` 为 false 时，直接返回 `{ items: [], source: 'unavailable' }`

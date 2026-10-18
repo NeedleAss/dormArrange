@@ -25,11 +25,17 @@
   </head>
   <body>
     <h1>方寸 · AI 导入自测</h1>
-    <p class="hint">独立测试文字导入。尺寸单位为 cm，规则解析可离线使用。</p>
+    <p class="hint">独立测试文字与照片导入。尺寸单位为 cm，规则解析可离线使用。</p>
     <form id="parse-form">
       <label for="items-text">物品清单</label>
       <textarea id="items-text" name="items" spellcheck="false">24寸行李箱，两床被子，27寸显示器，书20本，1500W电热水壶，一个尺寸不确定的收纳箱</textarea>
       <button id="parse-button" type="submit">解析</button>
+    </form>
+    <form id="photo-form">
+      <label for="photo-input">照片导入（加分）</label>
+      <input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-describedby="photo-hint" />
+      <button id="photo-button" type="submit" disabled>识别照片</button>
+      <p id="photo-hint" class="hint">正在检测图片支持情况…</p>
     </form>
     <section aria-live="polite" aria-atomic="true">
       <p>available：<strong id="available">检测中</strong>　source：<strong id="source">尚未解析</strong></p>
