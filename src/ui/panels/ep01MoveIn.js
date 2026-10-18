@@ -2,8 +2,14 @@ import { esc, clone } from '../helpers.js';
 let cleanup = () => {};
 let draft = '';
 const manifests = new WeakMap();
-const labels = { fits: '能放下', relocate: '需换位置', uncertain: '尺寸待定', overflow: '放不下', banned: '禁止携带' };
+const labels = { fits: '能放下', relocate: '需换位置', uncertain: '尺寸待定', overflow: '放不下', banned: '安全拦截 / 待核实' };
 const sources = { measured: '实测', product: '商品参数', estimated: '估计', unknown: '未知' };
+// 只转发 D 的固定安全提示；技术诊断码和未校验的上游原文不进入观众界面。
+const safetyWarnings = new Set([
+  '部分物品安全信息待核实，核实前暂不安排位置。',
+  '存在安全预检拦截物品，请查看原因并联系宿管。',
+  '已补回模型遗漏或改名的原文风险物品，请核对并联系宿管。'
+]);
 let filter = null;
 
 export function mount(el, ctx) {
@@ -91,6 +97,9 @@ export function mount(el, ctx) {
       acceptParsedItems(result.items, requestedText, owner);
       store.set({ ai: { ...store.get().ai, lastSource: result.source, available: result.source === 'ai', busy: false } });
       ctx.alert(result.source === 'ai' ? `AI 解析完成：${result.items.length} 件物品。` : 'AI 离线，已使用本地解析', result.source === 'ai' ? 'info' : 'warning');
+      for (const warning of new Set(Array.isArray(result.warnings) ? result.warnings : [])) {
+        if (safetyWarnings.has(warning)) ctx.alert(warning, 'warning');
+      }
       return true;
     } catch { ctx.alert('解析未完成，已保留上次清单。', 'error'); return false; }
     finally { store.set({ ai: { ...store.get().ai, busy: false } }); }
@@ -125,7 +134,8 @@ export function mount(el, ctx) {
       const report = planner.planMoveIn(s.room, s.items, { owner: s.owner, lockedZones: s.lockedZones, existing: fixedBaseline(s).placements });
       store.set({ placements: report.placements, itemStates: Object.fromEntries(Object.entries(report.verdicts).map(([id,v]) => [id,v.status])), fitReport: report, sync: report.sync,
         syncHistory: [...s.syncHistory, { t: new Date().toISOString(), total: report.sync.total, label: '入住' }].slice(-60), movePlan: null, tdmPlan: null });
-      ctx.alert(report.summary.overflow ? `规划完成，${report.summary.overflow} 件物品需要重新安排。` : '规划完成，没有放不下的物品。', report.summary.overflow ? 'warning' : 'success');
+      const { banned, overflow } = report.summary;
+      ctx.alert(banned ? `规划完成，${banned} 件物品被安全拦截或待核实，暂不安排位置。${overflow ? `另有 ${overflow} 件需要重新安排。` : ''}` : overflow ? `规划完成，${overflow} 件物品需要重新安排。` : '规划完成，没有放不下的物品。', banned || overflow ? 'warning' : 'success');
     } catch { ctx.alert('规划暂未完成，请检查尺寸后重试；上次结果已保留。', 'error'); }
   };
   function render(s) {
@@ -143,7 +153,10 @@ export function mount(el, ctx) {
     host.innerHTML = `<div class="section-title">适配结果</div><div class="verdict-badges">${Object.entries(labels).map(([status,label]) => `<button data-filter="${status}" class="verdict-badge ${status} ${filter === status ? 'selected' : ''}"><b>${report.summary[status]}</b>${label}</button>`).join('')}</div>${Object.entries(labels).filter(([status]) => !filter || status === filter).map(([status,label]) => `<section class="verdict-group ${status}"><h3>${label} <span class="mono">${report.summary[status]}</span></h3>${s.items.filter(i => report.verdicts[i.id]?.status === status).map(item => {
       const v = report.verdicts[item.id]; const zone = s.room.zones.find(z => z.id === v.zoneId); const selected = s.selection === item.id;
       const details = [...new Set([...v.reasons, v.tolerance?.text, v.need?.text, ...v.suggestions])].filter(text => text && text !== v.reasons[0]);
-      return `<div class="verdict-item"><button data-result="${esc(item.id)}" aria-expanded="${selected}"><strong>${esc(item.name)}</strong><span>${esc(zone?.label || (status === 'banned' ? '禁止携带' : '等待安排'))}</span><small>${esc(v.reasons[0] || '')}</small></button>${selected ? `<div class="verdict-detail"><p class="mono">${item.size.w}×${item.size.d}×${item.size.h} cm / ${sources[item.sizeSource]}</p>${details.map(text => `<p${text === v.tolerance?.text ? ' class="cyan"' : ''}>${esc(text)}</p>`).join('')}</div>` : ''}</div>`;
+      // 本地规则优先于 AI 标记，待核实不能冒充校规确认禁用，clear 也不能撤销硬规则。
+      const ruleId = status === 'banned' ? planner.checkRules?.(item)?.ruleId : null;
+      const safetyLabel = ruleId === 'R-SAFETY-REVIEW' ? '安全待核实' : /^(R-FIRE|R-FUEL|R-EXPLOSIVE|R-HAZMAT|R-WEAPON|R-AI-SAFETY)$/.test(ruleId) ? '安全拦截' : '宿舍禁用';
+      return `<div class="verdict-item"><button data-result="${esc(item.id)}" aria-expanded="${selected}"><strong>${esc(item.name)}</strong><span>${esc(zone?.label || (status === 'banned' ? safetyLabel : '等待安排'))}</span><small>${esc(v.reasons[0] || '')}</small></button>${selected ? `<div class="verdict-detail"><p class="mono">${item.size.w}×${item.size.d}×${item.size.h} cm / ${sources[item.sizeSource]}</p>${details.map(text => `<p${text === v.tolerance?.text ? ' class="cyan"' : ''}>${esc(text)}</p>`).join('')}</div>` : ''}</div>`;
     }).join('') || '<p class="hint">暂无物品</p>'}</section>`).join('')}<button id="export-tolerance" class="btn full compact">复制尺寸核对清单</button>`;
   }
   el.querySelector('#item-editor').onchange = event => {
