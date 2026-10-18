@@ -4,12 +4,13 @@ import '@fontsource/barlow-condensed/700.css';
 import '@fontsource/share-tech-mono/400.css';
 import './styles/tokens.css';
 import './styles/eva.css';
+import './styles/expressive.css';
 import { createStore, createInitialState } from './core/store.js';
 import { mountShell, panelHeading } from './ui/shell.js';
 import { bindScene } from './ui/sceneBinder.js';
 import { EPISODES } from './ui/helpers.js';
 import { boot } from './ui/boot.js';
-import { showTitleCard } from './ui/titleCard.js';
+import { showTitleCard, dismissTitleCard } from './ui/titleCard.js';
 import * as modelPanel from './ui/panels/ep00Model.js';
 import * as moveInPanel from './ui/panels/ep01MoveIn.js';
 import * as focusPanel from './ui/panels/ep02Focus.js';
@@ -17,6 +18,7 @@ import * as seasonsPanel from './ui/panels/ep03Seasons.js';
 import * as growthPanel from './ui/panels/ep04Growth.js';
 import { mountMonitor } from './ui/widgets/monitor.js';
 import { createFocusTimer } from './ui/widgets/focusTimer.js';
+import { createIdleDemo } from './ui/idleDemo.js';
 
 // glob 只收集已存在的公开入口，缺席车道不会触发浏览器 404 或构建失败。
 const loaders = import.meta.glob(['./planner/index.js', './scene/index.js', './ai/index.js']);
@@ -35,20 +37,21 @@ try {
     document.querySelector('#scene-placeholder').hidden = true;
   }
 } catch { document.querySelector('#scene-placeholder b').textContent = '需要支持 WebGL 的浏览器'; alert('三维视图暂不可用，仍可编辑清单与尺寸。', 'warning'); }
-bindScene(store, scene);
+bindScene(store, scene, shell.sceneFallback);
 const ai = await load('./ai/index.js');
 if (ai?.aiAvailable) ai.aiAvailable().then(available => store.set({ ai: { ...store.get().ai, available } })).catch(() => {});
-const ctx = { store, scene, planner, ai, alert, footer: shell.footer, showTitleCard };
+const ctx = { store, scene, planner, ai, alert, footer: shell.footer, showTitleCard, dismissTitleCard };
 const focusTimer = createFocusTimer(ctx);
 ctx.startFocus = focusTimer.start;
 let navigating = false;
-async function navigate(id) {
+async function navigate(id, { isCurrent = () => true } = {}) {
   if (navigating || id === store.get().episode) return;
   navigating = true;
-  const ep = EPISODES.find(e => e.id === id);
-  await showTitleCard({ ...ep, en: `EPISODE ${id.slice(-2)} // ${ep.en}` });
-  store.set({ episode: id });
-  navigating = false;
+  try {
+    const ep = EPISODES.find(e => e.id === id);
+    await showTitleCard({ ...ep, en: `EPISODE ${id.slice(-2)} // ${ep.en}` });
+    if (isCurrent()) store.set({ episode: id });
+  } finally { navigating = false; }
 }
 let activePanel = null;
 const panels = { EP00: modelPanel, EP01: moveInPanel, EP02: focusPanel, EP03: seasonsPanel, EP04: growthPanel };
@@ -62,12 +65,27 @@ function render() {
 }
 document.querySelectorAll('[data-episode]').forEach(b => b.onclick = () => navigate(b.dataset.episode));
 document.addEventListener('keydown', event => {
-  if (event.target.closest('input,textarea,select,[contenteditable]') || document.querySelector('.title-card,.boot-screen')) return;
+  if (event.target.closest('input,textarea,select,[contenteditable]') || document.querySelector('.title-card,.boot-screen,.focus-limit')) return;
   if (/^[0-4]$/.test(event.key)) navigate(`EP0${event.key}`);
+  if (event.key.toLowerCase() === 't') {
+    const modes = ['orbit', 'top', 'seat'];
+    store.set({ camera: modes[(modes.indexOf(store.get().camera) + 1) % modes.length] });
+  }
+  if (event.key.toLowerCase() === 'l') {
+    const s = store.get(); const zone = s.room?.zones.find(z => z.id === s.selection);
+    if (zone && zone.kind !== 'keepClear') store.set({ lockedZones: s.lockedZones.includes(zone.id) ? s.lockedZones.filter(id => id !== zone.id) : [...s.lockedZones, zone.id], movePlan: null });
+  }
+  if (event.code === 'Space' && ['EP03', 'EP04'].includes(store.get().episode)) {
+    event.preventDefault();
+    shell.panel.querySelector(store.get().episode === 'EP03' ? '[data-season-play]' : '[data-growth-replay]')?.click();
+  }
 });
 store.subscribe(render, ['episode']); render();
 mountMonitor(shell.monitor, ctx);
 alert(planner ? '宿舍模板已载入，尺寸单位 cm。' : '规划模块加载中。');
 await boot({ planner, scene, ai });
+ctx.navigate = navigate;
+ctx.refreshPanel = render;
+createIdleDemo(ctx);
 }
 main();

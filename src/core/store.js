@@ -17,6 +17,8 @@ export function createStore(initialState = {}) {
         try { localStorage.setItem('fangcun.v1', JSON.stringify({ roomParams: state.roomParams, snapshots: state.snapshots, focusMinutes: state.focusMinutes })); } catch { /* 配额不足不阻塞操作。 */ }
       }
       for (const entry of [...listeners]) {
+        // 话切换可能在同一轮广播中卸载旧面板，不再调用已取消的订阅。
+        if (!listeners.has(entry)) continue;
         if (!entry.keys || entry.keys.some(key => changed.includes(key))) entry.fn(state, changed);
       }
     },

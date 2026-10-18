@@ -1,12 +1,14 @@
 import { esc, clone, syncPatch } from '../helpers.js';
 let cleanup = () => {};
 const starts = new WeakMap();
+const startItems = new WeakMap();
 
 /** 腾桌只编排公开 API，移动中的几何交给场景；跳步交给 planner.applySteps。 */
 export function mount(el, ctx) {
   const { store, planner, scene } = ctx;
   if (!planner) { el.innerHTML = '<p class="empty">规划模块加载中</p>'; return; }
   let controller = null;
+  let playbackPlan = null;
   let playing = false;
   let paused = false;
   let active = true;
@@ -16,25 +18,30 @@ export function mount(el, ctx) {
   function stopPlayback() {
     controller?.stop?.(); controller = null;
     clearTimeout(fallbackTimer); fallbackTimer = null;
-    playing = false; paused = false;
+    playing = false; paused = false; playbackPlan = null;
   }
   function settlePlayback() {
-    const s = store.get(); const plan = s.movePlan;
+    const s = store.get(); const plan = playbackPlan || s.movePlan;
     const wasPlaying = playing;
     stopPlayback();
-    if (wasPlaying && plan) store.set({ placements: planner.applySteps(starts.get(plan) || s.placements, plan.steps, s.stepIndex) });
+    if (wasPlaying && plan) store.set({ placements: planner.applySteps(starts.get(plan) || s.placements, plan.steps, s.stepIndex), items: itemsAfter(plan, s.stepIndex) });
+  }
+  function itemsAfter(plan, upto) {
+    const disposed = new Set(plan.steps.slice(0, upto).filter(step => step.kind === 'dispose').map(step => step.itemId));
+    return (startItems.get(plan) || store.get().items).filter(item => !disposed.has(item.id));
   }
   function seek(index) {
     const s = store.get(); const plan = s.movePlan; if (!plan) return;
     stopPlayback();
     const upto = Math.max(0, Math.min(Number(index), plan.steps.length));
     const placements = planner.applySteps(starts.get(plan) || s.placements, plan.steps, upto);
-    const itemStates = Object.fromEntries(s.items.map(item => [item.id, plan.conflicts.includes(item.id) ? 'conflict' : 'fits']));
+    const items = itemsAfter(plan, upto);
+    const itemStates = Object.fromEntries(items.map(item => [item.id, plan.conflicts.includes(item.id) ? 'conflict' : 'fits']));
     plan.steps.slice(0,upto).forEach(step => { itemStates[step.itemId] = step.kind === 'dispose' ? 'stored' : 'moved'; });
     if (upto === plan.steps.length) {
-      store.set({ placements: plan.placementsAfter, stepIndex: upto, itemStates,
+      store.set({ items, placements: plan.placementsAfter, stepIndex: upto, itemStates,
         ...syncPatch(ctx, plan.placementsAfter, '腾桌完成', { focusBox: plan.focusBox, moves: plan.steps.length }) });
-    } else store.set({ placements, stepIndex: upto, itemStates });
+    } else store.set({ items, placements, stepIndex: upto, itemStates });
   }
   function finish(plan) {
     if (!active || store.get().movePlan !== plan) return;
@@ -49,6 +56,7 @@ export function mount(el, ctx) {
     let start = s.stepIndex;
     if (start >= plan.steps.length) { seek(0); start = 0; }
     playing = true; paused = false;
+    playbackPlan = plan;
     if (scene?.playSteps) {
       try {
         controller = scene.playSteps(plan.steps.slice(start), {
@@ -95,8 +103,10 @@ export function mount(el, ctx) {
     try {
       settlePlayback();
       const s = store.get();
+      if (s.lockedZones.includes(s.focusSpec.zoneId)) { ctx.alert('当前桌面已锁定，请先解锁桌面再生成腾桌指令。', 'warning'); return; }
       const plan = planner.planFocusField(s.room, s.items, s.placements, s.focusSpec, { lockedZones: s.lockedZones });
       starts.set(plan, clone(s.placements));
+      startItems.set(plan, s.items);
       const itemStates = Object.fromEntries(s.items.map(item => [item.id, plan.conflicts.includes(item.id) ? 'conflict' : 'fits']));
       store.set({ movePlan: plan, stepIndex: 0, itemStates, ...syncPatch(ctx, plan.placementsAfter, '腾桌预判', { focusBox: plan.focusBox, moves: plan.steps.length }) });
       ctx.alert(plan.conflicts.length ? `专注区检测到 ${plan.conflicts.length} 件冲突物品，生成 ${plan.steps.length} 步指令。` : '专注区已经净空。', plan.conflicts.length ? 'warning' : 'success');
@@ -112,11 +122,12 @@ export function mount(el, ctx) {
   ctx.footer.querySelector('#step-slider').oninput = event => seek(event.target.value);
   el.querySelector('#start-focus').onclick = () => ctx.startFocus?.();
   function render(s) {
+    if (playing && s.movePlan !== playbackPlan) settlePlayback();
     const plan = s.movePlan;
     el.querySelector('#focus-area').value = (s.focusSpec.w * s.focusSpec.d / 10000).toFixed(2);
     el.querySelectorAll('[data-focus-size]').forEach(button => button.classList.toggle('active', button.dataset.focusSize === `${s.focusSpec.w},${s.focusSpec.d}`));
     el.querySelector('#deploy').disabled = !s.items.length || !Object.keys(s.placements).length;
-    el.querySelector('#start-focus').disabled = !plan || s.stepIndex < plan.steps.length || plan.unresolved.length > 0;
+    el.querySelector('#start-focus').disabled = !plan || s.stepIndex < plan.steps.length || plan.unresolved.length > 0 || s.sync?.parts.focus !== 1;
     el.querySelector('#orders').innerHTML = plan ? `<div class="section-title">OPERATION ORDERS <span>${plan.steps.length} 步</span></div><div class="plan-metrics"><span><b>${plan.metrics.moves}</b> 件移动</span><span>约 <b>${Math.round(plan.metrics.estSeconds)}</b> 秒</span><span><b>${(plan.metrics.clearedArea / 10000).toFixed(2)}</b> ㎡</span></div>${plan.steps.length ? `<ol class="order-list">${plan.steps.map((step,i) => `<li class="${i < s.stepIndex ? 'done' : i === s.stepIndex ? 'current' : ''}"><button data-step="${i+1}"><span class="mono">${String(i+1).padStart(2,'0')}</span>${esc(step.text)}</button></li>`).join('')}</ol><div class="button-row"><button class="btn compact btn-primary" id="play-orders">${playing && !paused ? '暂停' : paused ? '继续' : s.stepIndex === plan.steps.length ? '重放' : '执行指令'}</button><button class="btn compact" id="step-order" ${s.stepIndex >= plan.steps.length ? 'disabled' : ''}>单步</button><button class="btn compact" id="reset-orders">复位</button></div>` : '<p class="green hint">专注区已经净空。</p>'}${plan.unresolved.map(entry => `<div class="unresolved"><b>${esc(s.items.find(i => i.id === entry.itemId)?.name || '待处理物品')}</b><p>${esc(entry.reason)}</p><p>${esc(entry.suggestion)}</p></div>`).join('')}` : '<p class="empty">展开力场，生成最少移动指令。</p>';
     const slider = ctx.footer.querySelector('#step-slider');
     if (slider) { slider.max = plan?.steps.length || 0; slider.value = s.stepIndex; slider.disabled = !plan?.steps.length; ctx.footer.querySelector('#step-count').textContent = `${s.stepIndex} / ${plan?.steps.length || 0}`; }

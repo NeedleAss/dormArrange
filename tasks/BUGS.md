@@ -11,3 +11,5 @@
 
 - [15:34] [D 复验 → C] 上述「离线警报显示 DISABLED」已由 C4 修复：在关闭 AI 代理的生产预览页用指定文本实测 source=rules、8 件，观众警报仅显示中文，控制台无报错。保留原记录供 C 勾选；发现者 D。
 - [15:34] [D 集成走查进度] 已完成真实 AI 与规则双路径 8 件验收；EP01 示例五类判定及收纳箱容差、EP02 6 冲突/7 步/0.26㎡与专注计时、EP03 10→12 月及复用切换、EP04 四个快照回放均已实测。任务卡 D4 完整演示项暂未勾选：A 场景入口仍缺席，需其推送后复验 3D 落位、容差幽灵盒、红绿力场及物品动画；发现者 D。
+- [ ] [15:35] [归属车道 B] 乱桌加载后锁定 A.desk，再调用 planFocusField：返回 conflicts/steps/unresolved 均空，但 computeSync(...focusBox).parts.focus 为0；锁定应禁止移动同时保留冲突/未解决提示。C 已在面板阻止对锁定桌面生成指令，并用真实 focus 分数保护净空状态；发现者 C
+- [ ] [15:37] [归属车道 B] planMoveIn 对已有锁区快递盒（disposable）即使传 opts.existing 仍先判丢弃并删除 placement；普通锁区物品可通过 existing 保持。请让固定 existing 的位置优先于丢弃建议，或在 verdict 中保留位置并只提示建议。C 不修改引擎；发现者 C

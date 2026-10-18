@@ -97,6 +97,7 @@ export function mount(el, ctx) {
 
   /** 延后计算以先绘制“计算中”；每次输入变化只产生一份全年计划。 */
   function scheduleCalculation(_state, changed = []) {
+    if (!active) return;
     stopPlayback();
     clearTimeout(calculation);
     if (changed.some(key => ['room', 'items', 'owner'].includes(key))) {
@@ -225,6 +226,7 @@ export function mount(el, ctx) {
 
   const unsubscribeInput = store.subscribe(scheduleCalculation, ['room', 'items', 'owner', 'lockedZones', 'tdm']);
   const unsubscribeRender = store.subscribe(render, ['tdmPlan', 'month', 'selection']);
+  ctx.setSeasonMonth = applyMonth;
   cleanup = () => {
     active = false;
     revision++;
@@ -232,6 +234,7 @@ export function mount(el, ctx) {
     stopPlayback();
     unsubscribeInput();
     unsubscribeRender();
+    if (ctx.setSeasonMonth === applyMonth) delete ctx.setSeasonMonth;
     slider.oninput = null;
   };
   const state = store.get();

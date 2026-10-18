@@ -1,6 +1,7 @@
 import { esc, clone } from '../helpers.js';
 let cleanup = () => {};
 let draft = '';
+const manifests = new WeakMap();
 const labels = { fits: '能放下', relocate: '需换位置', uncertain: '尺寸待定', overflow: '放不下', banned: '禁止携带' };
 const sources = { measured: '实测', product: '商品参数', estimated: '估计', unknown: '未知' };
 let filter = null;
@@ -9,15 +10,49 @@ export function mount(el, ctx) {
   const { store, planner, ai } = ctx;
   if (!planner) { el.innerHTML = '<p class="empty">规划模块加载中</p>'; return; }
   let active = true;
-  let parsedDraft = store.get().items.length ? draft : null;
+  // 只记录真正解析成功的文本；切话、换使用者或外部替换物品不能被误判为已解析。
+  if (!manifests.has(store)) manifests.set(store, { parsedDraft: null, owner: null, items: null, origins: new Map() });
+  const manifest = manifests.get(store);
   el.innerHTML = `<div class="section-title">MANIFEST INPUT <span>入住清单</span></div><textarea id="items-text" rows="5" aria-label="物品清单" placeholder="24寸行李箱，两床被子，27寸显示器，书20本……">${esc(draft)}</textarea><div class="button-row"><button class="btn compact" id="freshman">载入新生示例</button><button class="btn compact" id="parse">解析清单</button></div><div class="library-add"><select id="library" aria-label="物品库"><option value="">从物品库添加一件…</option>${planner.LIBRARY.map(i => `<option value="${esc(i.libId)}">${esc(i.name)}</option>`).join('')}</select><button class="btn compact" id="add">＋</button></div><p class="hint" id="parse-source">支持自然语言；AI 离线时自动使用本地规则。</p><div id="item-editor"></div><button id="plan" class="btn btn-primary full">开始规划 / DEPLOY</button><div id="results"></div>`;
   const text = el.querySelector('#items-text');
-  const invalidate = items => store.set({ items, placements: {}, itemStates: {}, fitReport: null, movePlan: null, tdmPlan: null, sync: null, selection: null });
+  const identity = item => `${item.owner}|${item.category}|${item.libId || item.name.trim().toLowerCase()}`;
+  function fixedBaseline(state) {
+    const locked = new Set(state.lockedZones);
+    const items = state.items.filter(item => item.owner !== state.owner || locked.has(state.placements[item.id]?.zoneId));
+    const ids = new Set(items.map(item => item.id));
+    return { items, placements: Object.fromEntries(Object.entries(state.placements).filter(([id]) => ids.has(id))) };
+  }
+  function invalidate(items) {
+    const state = store.get();
+    const fixed = fixedBaseline(state);
+    // 固定物品既保留原位置也保留原对象，避免解析、增删或编辑把锁区/室友的东西清空。
+    const merged = new Map(items.map(item => [item.id, item]));
+    fixed.items.forEach(item => merged.set(item.id, item));
+    const nextItems = [...merged.values()];
+    manifest.items = nextItems;
+    const nextIds = new Set(nextItems.map(item => item.id));
+    for (const id of manifest.origins.keys()) if (!nextIds.has(id)) manifest.origins.delete(id);
+    store.set({ items: nextItems, placements: fixed.placements,
+      itemStates: Object.fromEntries(fixed.items.map(item => [item.id, state.itemStates[item.id] || 'fits'])),
+      fitReport: null, movePlan: null, tdmPlan: null, sync: null, selection: null });
+  }
+  function fixedReason(itemId) {
+    const state = store.get();
+    const item = state.items.find(entry => entry.id === itemId);
+    if (item?.owner !== state.owner) return '这是其他使用者的物品，请先切换到对应使用者再编辑。';
+    if (state.lockedZones.includes(state.placements[itemId]?.zoneId)) return '物品所在分区已锁定，请先解锁再编辑或移除。';
+    return null;
+  }
+  function restoreEditor(openIds) {
+    render(store.get());
+    el.querySelectorAll('details').forEach(detail => { if (openIds.includes(detail.dataset.item || 'list')) detail.open = true; });
+  }
   const updateButton = () => { el.querySelector('#plan').disabled = store.get().ai.busy || (!store.get().items.length && !text.value.trim()); };
   text.oninput = () => { draft = text.value; updateButton(); };
   async function parse() {
     if (!text.value.trim()) return false;
     const requestedText = text.value;
+    draft = requestedText;
     store.set({ ai: { ...store.get().ai, busy: true } });
     try {
       const owner = store.get().owner;
@@ -26,9 +61,31 @@ export function mount(el, ctx) {
       catch { result = { items: planner.parseItemsText(requestedText, { owner }), source: 'rules', warnings: [] }; }
       if (!active) return false;
       if (text.value !== requestedText) { ctx.alert('清单已更改，请重新解析最新内容。', 'warning'); return false; }
+      if (store.get().owner !== owner) { ctx.alert('使用者已更改，请重新解析清单。', 'warning'); return false; }
       if (!result.items?.length) { ctx.alert('没有识别到物品，请换一种写法或从物品库添加。', 'warning'); return false; }
-      const manualItems = store.get().items.filter(item => item.id.startsWith('manual-'));
-      invalidate([...result.items, ...manualItems]); parsedDraft = requestedText;
+      const state = store.get();
+      const fixed = fixedBaseline(state);
+      const manualItems = state.items.filter(item => item.id.startsWith('manual-'));
+      const fixedByIdentity = new Map();
+      for (const item of fixed.items) {
+        const key = manifest.origins.get(item.id) || identity(item);
+        const entries = fixedByIdentity.get(key) || [];
+        entries.push(item);
+        fixedByIdentity.set(key, entries);
+      }
+      const prefix = `parsed-${crypto.randomUUID()}`;
+      const parsedItems = [];
+      result.items.forEach((item, index) => {
+        const key = identity(item);
+        // 按件消耗已固定的同类物品；同清单重解析不会再添一份，数量增加时只补新增件数。
+        if (fixedByIdentity.get(key)?.shift()) return;
+        const next = { ...clone(item), id: `${prefix}-${index + 1}` };
+        manifest.origins.set(next.id, key);
+        parsedItems.push(next);
+      });
+      invalidate([...parsedItems, ...fixed.items, ...manualItems]);
+      manifest.parsedDraft = requestedText;
+      manifest.owner = owner;
       store.set({ ai: { ...store.get().ai, lastSource: result.source, available: result.source === 'ai', busy: false } });
       ctx.alert(result.source === 'ai' ? `AI 解析完成：${result.items.length} 件物品。` : 'AI 离线，已使用本地解析', result.source === 'ai' ? 'info' : 'warning');
       return true;
@@ -44,10 +101,11 @@ export function mount(el, ctx) {
   };
   el.querySelector('#plan').onclick = async () => {
     if (store.get().ai.busy) return;
-    if (text.value.trim() && parsedDraft !== text.value && !await parse()) return;
+    const current = store.get();
+    if (text.value.trim() && (manifest.parsedDraft !== text.value || manifest.owner !== current.owner || manifest.items !== current.items) && !await parse()) return;
     const s = store.get(); if (!s.items.length) return;
     try {
-      const report = planner.planMoveIn(s.room, s.items, { owner: s.owner, lockedZones: s.lockedZones });
+      const report = planner.planMoveIn(s.room, s.items, { owner: s.owner, lockedZones: s.lockedZones, existing: fixedBaseline(s).placements });
       store.set({ placements: report.placements, itemStates: Object.fromEntries(Object.entries(report.verdicts).map(([id,v]) => [id,v.status])), fitReport: report, sync: report.sync,
         syncHistory: [...s.syncHistory, { t: new Date().toISOString(), total: report.sync.total, label: '入住' }].slice(-60), movePlan: null, tdmPlan: null });
       ctx.alert(report.summary.overflow ? `规划完成，${report.summary.overflow} 件物品需要重新安排。` : '规划完成，没有放不下的物品。', report.summary.overflow ? 'warning' : 'success');
@@ -71,6 +129,9 @@ export function mount(el, ctx) {
   }
   el.querySelector('#item-editor').onchange = event => {
     const row = event.target.closest('[data-item]'); if (!row) return;
+    const openIds = [...el.querySelectorAll('details[open]')].map(detail => detail.dataset.item || 'list');
+    const reason = fixedReason(row.dataset.item);
+    if (reason) { ctx.alert(reason, 'warning'); restoreEditor(openIds); return; }
     const item = clone(store.get().items.find(i => i.id === row.dataset.item));
     if (event.target.dataset.size) {
       if (!event.target.checkValidity()) { event.target.reportValidity(); return; }
@@ -88,11 +149,16 @@ export function mount(el, ctx) {
       }
     }
     // 保留原生 details 的展开状态，让连续量尺寸无需反复展开。
-    const openIds = [...el.querySelectorAll('details[open]')].map(d => d.dataset.item || 'list');
     invalidate(store.get().items.map(i => i.id === item.id ? item : i));
     el.querySelectorAll('details').forEach(d => { if (openIds.includes(d.dataset.item || 'list')) d.open = true; });
   };
-  el.querySelector('#item-editor').onclick = event => { const remove = event.target.closest('[data-remove]'); if (remove) invalidate(store.get().items.filter(i => i.id !== remove.dataset.remove)); };
+  el.querySelector('#item-editor').onclick = event => {
+    const remove = event.target.closest('[data-remove]');
+    if (!remove) return;
+    const reason = fixedReason(remove.dataset.remove);
+    if (reason) { ctx.alert(reason, 'warning'); return; }
+    invalidate(store.get().items.filter(item => item.id !== remove.dataset.remove));
+  };
   el.querySelector('#results').onclick = async event => {
     const badge = event.target.closest('[data-filter]'); if (badge) { filter = filter === badge.dataset.filter ? null : badge.dataset.filter; renderResults(store.get()); }
     const result = event.target.closest('[data-result]'); if (result) store.set({ selection: store.get().selection === result.dataset.result ? null : result.dataset.result });

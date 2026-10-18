@@ -1,7 +1,10 @@
+import { renderBlueprint } from './blueprint.js';
+
 /** store → scene 唯一接线点；面板不调用场景的 set* 方法。 */
-export function bindScene(store, scene) {
+export function bindScene(store, scene, fallbackElement = null) {
   function update(s, keys) {
     const has = (...names) => names.some(name => keys.includes(name));
+    if (!scene && fallbackElement && has('room','items','placements','itemStates','episode','movePlan','stepIndex')) fallbackElement.innerHTML = renderBlueprint(s);
     if (has('room') && s.room) scene?.setRoom?.(s.room);
     if (has('room', 'placements', 'lockedZones')) {
       const occupied = new Set(Object.values(s.placements).map(p => p.zoneId));
@@ -9,7 +12,7 @@ export function bindScene(store, scene) {
         s.lockedZones.includes(z.id) ? 'done' : occupied.has(z.id) ? 'designing' : 'empty']));
       store.set({ zoneStatus });
     }
-    if (has('zoneStatus')) scene?.setZoneStatus?.(s.zoneStatus);
+    if (has('zoneStatus')) scene?.setZoneStatus?.(store.get().zoneStatus);
     if (has('items', 'placements', 'fitReport')) {
       // 丢弃步骤已完成的物品不再进入滞留区；回退步骤时可重新显示。
       const disposed = new Set((s.movePlan?.steps || []).slice(0, s.stepIndex).filter(step => step.kind === 'dispose').map(step => step.itemId));
@@ -20,7 +23,7 @@ export function bindScene(store, scene) {
     if (has('movePlan', 'stepIndex', 'episode')) {
       const plan = s.episode === 'EP02' ? s.movePlan : null;
       scene?.showFocusField?.(plan?.focusBox || null);
-      scene?.setFocusFieldState?.(plan && s.stepIndex >= plan.steps.length && !plan.unresolved.length ? 'clear' : 'conflict');
+      scene?.setFocusFieldState?.(plan && s.stepIndex >= plan.steps.length && !plan.unresolved.length && s.sync?.parts.focus === 1 ? 'clear' : 'conflict');
     }
     if (has('selection')) {
       const verdict = s.fitReport?.verdicts[s.selection];

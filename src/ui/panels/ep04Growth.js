@@ -26,6 +26,8 @@ export function mount(el, ctx) {
   let replayIndex = 0;
   const presets = Array.isArray(planner.PRESETS?.growth) ? planner.PRESETS.growth : [];
   const presetIds = new Set(presets.map(snapshot => snapshot.id));
+  // 待机演示使用内存预览集合，不覆盖用户已保存的快照或累计时长。
+  const snapshotsOf = (state = store.get()) => ctx.previewSnapshots || state.snapshots || [];
 
   el.innerHTML = `<div class="growth-summary" aria-label="当前布局统计"><div><span>FOCUS / 累计专注</span><strong class="growth-minutes mono">0<small>min</small></strong></div><div><span>ITEMS / 当前物品</span><strong class="growth-items mono">0<small>件</small></strong></div></div>
     <div class="section-title">LAYOUT ARCHIVE <span>保存这一刻</span></div>
@@ -52,7 +54,7 @@ export function mount(el, ctx) {
   const itemCount = el.querySelector('.growth-items');
   const chart = el.querySelector('.growth-chart');
   const recordCount = el.querySelector('.growth-record-count');
-  const latest = store.get().snapshots?.at(-1);
+  const latest = snapshotsOf().at(-1);
   if (semesters.some(semester => semester.code === latest?.semester)) semesterInput.value = latest.semester;
 
   function stopPlayback(render = true) {
@@ -87,7 +89,7 @@ export function mount(el, ctx) {
   }
 
   function loadSnapshot(id, notify = false) {
-    const snapshot = store.get().snapshots.find(entry => entry.id === id);
+    const snapshot = snapshotsOf().find(entry => entry.id === id);
     if (!snapshot) return false;
     try {
       const patch = snapshotPatch(snapshot);
@@ -147,7 +149,7 @@ export function mount(el, ctx) {
 
   function replay() {
     if (playing) { stopPlayback(); return; }
-    const snapshots = store.get().snapshots;
+    const snapshots = snapshotsOf();
     if (snapshots.length < 2) return;
     replayIds = snapshots.map(snapshot => snapshot.id);
     replayIndex = 0;
@@ -173,7 +175,8 @@ export function mount(el, ctx) {
   }
 
   function renderStats(state) {
-    const duration = Math.max(0, Number(state.focusMinutes) || 0);
+    const preview = ctx.previewSnapshots?.find(snapshot => snapshot.id === ctx.previewSnapshotId);
+    const duration = Math.max(0, Number(preview ? preview.focusMinutes : state.focusMinutes) || 0);
     minutes.innerHTML = `${duration.toLocaleString('zh-CN')}<small>min</small>`;
     itemCount.innerHTML = `${state.items.length}<small>件</small>`;
     saveButton.disabled = !state.room || !!state.timer?.running;
@@ -181,7 +184,8 @@ export function mount(el, ctx) {
   }
 
   function renderRecords(state) {
-    const snapshots = state.snapshots || [];
+    const snapshots = snapshotsOf(state);
+    if (ctx.previewSnapshotId) selectedId = ctx.previewSnapshotId;
     const selected = snapshots.find(snapshot => snapshot.id === selectedId);
     const focused = document.activeElement;
     const focusHost = records.contains(focused) ? records : timeline.contains(focused) ? timeline : null;
