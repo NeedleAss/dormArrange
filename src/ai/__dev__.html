@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>方寸 · AI 导入自测</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #12151b; color: #eef0f6; }
+      body { max-width: 960px; margin: 40px auto; padding: 0 20px; }
+      h1 { color: #e8b76b; font-size: 1.7rem; }
+      p, li { line-height: 1.6; }
+      label { display: block; margin-bottom: 10px; }
+      textarea { box-sizing: border-box; width: 100%; min-height: 130px; padding: 12px; color: inherit; background: #1b2029; border: 1px solid #596273; border-radius: 4px; font: inherit; }
+      button { margin: 12px 0; padding: 10px 26px; border: 0; border-radius: 4px; background: #e8b76b; color: #161719; font: inherit; font-weight: 700; cursor: pointer; }
+      button:disabled { opacity: .55; cursor: wait; }
+      button:focus-visible, textarea:focus-visible { outline: 2px solid #a8d9ff; outline-offset: 3px; }
+      #warnings { color: #f6ca8b; }
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+      th, td { padding: 12px; border-bottom: 1px solid #3a4353; text-align: left; }
+      th { background: #202632; }
+      caption { padding: 12px 0; text-align: left; }
+      .hint { color: #acb6c7; }
+    </style>
+  </head>
+  <body>
+    <h1>方寸 · AI 导入自测</h1>
+    <p class="hint">独立测试文字导入。尺寸单位为 cm，规则解析可离线使用。</p>
+    <form id="parse-form">
+      <label for="items-text">物品清单</label>
+      <textarea id="items-text" name="items" spellcheck="false">24寸行李箱，两床被子，27寸显示器，书20本，1500W电热水壶，一个尺寸不确定的收纳箱</textarea>
+      <button id="parse-button" type="submit">解析</button>
+    </form>
+    <section aria-live="polite" aria-atomic="true">
+      <p>available：<strong id="available">检测中</strong>　source：<strong id="source">尚未解析</strong></p>
+      <p id="status">准备就绪</p>
+      <ul id="warnings" aria-label="解析提示"></ul>
+    </section>
+    <div class="table-wrap">
+      <table>
+        <caption id="item-count">物品：0 件</caption>
+        <thead>
+          <tr><th scope="col">名称</th><th scope="col">类别</th><th scope="col">W × D × H（cm）</th><th scope="col">sizeSource</th><th scope="col">powerW</th></tr>
+        </thead>
+        <tbody id="items-body"></tbody>
+      </table>
+    </div>
+    <p class="hint">验收：共 8 件；电热水壶功率为 1500 W；收纳箱尺寸来源为 unknown 或 estimated。</p>
+    <script type="module" src="./__dev__.js"></script>
+  </body>
+</html>

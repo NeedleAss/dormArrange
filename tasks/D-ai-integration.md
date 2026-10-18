@@ -10,16 +10,16 @@
 
 ## D1 代理与客户端（15 分钟）
 
-- [ ] `vite.config.js`：
+- [x] `vite.config.js`：
   - 用 `loadEnv(mode, process.cwd(), '')` 读取 `AI_*` 变量。它们没有 `VITE_` 前缀，所以不会进前端包。
   - `server.proxy['/ai/v1']` 转发到 `AI_BASE_URL`，rewrite 去掉 `/ai/v1` 前缀。
   - 在 `configure(proxy)` 里监听 `proxyReq`，设置请求头 `Authorization: Bearer ${AI_API_KEY}`。
   - 写一个小插件，`configureServer` 中间件响应 `GET /ai/__config`，返回 `{ enabled, model, wire, vision }`。**不返回 key。**
-- [ ] `src/ai/client.js`：`chat(messages, { json = true, timeoutMs = 20000, images })`。
+- [x] `src/ai/client.js`：`chat(messages, { json = true, timeoutMs = 20000, images })`。
   - 按 wire 选择请求体格式，`chat` 或 `responses`（docs/08 §3）
   - 返回纯文本
   - 超时或 4xx/5xx 时抛出带 `code` 的错误
-- [ ] `src/ai/index.js`，导出：
+- [x] `src/ai/index.js`，导出：
   - `aiAvailable()`：请求一次 `/ai/__config` 并缓存结果
   - `aiParseItems`、`aiParsePhoto`、`aiExplainPlan`：后两个先抛 `{ code: 'NOT_IMPLEMENTED' }`
 
