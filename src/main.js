@@ -92,6 +92,6 @@ if (!planner) alert('规划模块加载中。');
 await boot({ planner, scene, ai });
 ctx.navigate = navigate;
 ctx.refreshPanel = render;
-createIdleDemo(ctx);
+createIdleDemo(ctx, { idleMs: 300000 });
 }
 main();
