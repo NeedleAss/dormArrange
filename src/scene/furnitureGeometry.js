@@ -208,16 +208,17 @@ export function createFurnitureView(fixture, room) {
       for (const x of [w * 0.025, w * 0.975]) rod([x, h * 0.05, d * 0.5], [x, h - 1, d * 0.9], Math.min(0.8, w * 0.025));
       return;
     }
-    const radius = Math.min(1.6, w * 0.06, d * 0.2), inset = radius * 1.4;
-    const z = d / 2, finish = modern ? 'light' : 'main';
-    for (const x of [inset, w - inset]) {
-      if (modern) curve([[x, radius, z], [x, h - 8, z], [x, h - radius, z - Math.min(2, d / 4)]], radius, finish);
+    // 直梯正面朝中央过道（±x）：x 是厚度，梯梁分列 z 两端，踏棍沿 z 连接。
+    const radius = Math.min(1.6, w * 0.2, d * 0.06), inset = radius * 1.4;
+    const x = w / 2, finish = modern ? 'light' : 'main';
+    for (const z of [inset, d - inset]) {
+      if (modern) curve([[x, radius, z], [x, h - 8, z], [x - Math.min(2, w / 4), h - radius, z]], radius, finish);
       else rod([x, radius, z], [x, h - radius, z], radius, finish);
     }
     const count = Math.max(3, Math.round(h / 26));
     for (let i = 1; i <= count; i += 1) {
       const y = (h - radius * 2) * i / (count + 1) + radius;
-      rod([inset, y, z], [w - inset, y, z], radius * 0.8, finish);
+      rod([x, y, inset], [x, y, d - inset], radius * 0.8, finish);
     }
   }
 
