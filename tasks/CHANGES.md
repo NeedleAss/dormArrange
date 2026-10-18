@@ -103,3 +103,10 @@
   **回归**：新增60项直接床规则/容器级联回归；正式测试命令 `npm test -- --test-concurrency=1 tests/*.test.js src/ai/*.test.js src/ui/*.test.js` 412/412通过、0失败/0TODO；生产构建通过，保留既有大包提示。显式测试范围用于排除本机未跟踪旧副本 dormArrange-test/ 的重复发现/旧代理端口冲突，不修改副本或package.json。
 
   **浏览器自测**：独立dev5182已执行EP01新生规划、EP02乱桌七步动画（7/7、可开始专注）、EP03开/关复用各遍历全部12月、EP04成长示例并完整回放至29件100%。各流程捕获pageerror/console.error均为空；公开API与几何回归同时核对床上仅有床品。
+
+
+- [17:58] [人类已授权 / B 合入三床补丁 → A/C] 已核对 nanqu_new 照片1616/1617，合入另一聊天经人类授权转来的最小数据补丁；本条覆盖此前新装修“四人间/四套单元”描述。`nanqu1` occupants固定ABC，A右前、B左后、C右后；左前原床桌梯整体替换为 `Fixture { id:'pub.cabinetBank#fx', type:'wardrobe', owner:'pub', label:'固定通高柜区' }`。柜区盒x[0,wardrobeDepth]、z[startZ,startZ+len]、y[0,bedY+bedThick+railH]，默认60×220×230cm，仍estimated：无尺标，沿用床桌单元估计比例；柜内未实测，不新增可规划容量。紫荆/原南区四席不变，床品硬限制作用于所有实际存在床位；不产生虚构D床/桌/梯/分区。
+
+  `buildRoom({templateId:'nanqu1',...旧四席参数})`会归一occupantsABC及原四人模板名称，保留显式尺寸校准且不改输入。A/C配套已由对方提交，本次B只改模板和测试。旧nanqu1 A/C位置随拓扑变化，C必须先用完整items及`planMoveIn(...,{existing,lockedZones})`重校，不能直接恢复旧坐标或只调用focus；旧D归属物品须保留并明确让用户核对归属，不能默默删除或重新指派。左前柜区不应恢复为可放物空地。
+
+  验证：新增5项三床/柜区/旧参迁移/几何/确定性测试，床规则测试改遍历模板真实occupants（新装修无D床）。正式全套415/415通过、生产构建通过；独立dev浏览器实测三床+柜区标题、ABC选项和3个loftBed、柜区位置、新生入住20/11/2/0/1，console.error/pageerror=[]。当前床政策提交`ec7f2ec9fd063e36cd258e7dfa741de6de5d6376`已推送，本次数据另行提交。

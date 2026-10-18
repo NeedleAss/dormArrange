@@ -90,7 +90,7 @@ test('三模板返回完整独立参数，照片差异反映到尺寸、家具�
     for (const key of ['room', 'door', 'balcony', 'unit']) {
       assert.deepEqual(Object.keys(room.params[key]).sort(), Object.keys(DEFAULT_PARAMS[key]).sort());
     }
-    assert.equal(room.fixtures.filter((fx) => fx.type === 'loftBed').length, 4);
+    assert.equal(room.fixtures.filter((fx) => fx.type === 'loftBed').length, room.id === 'nanqu1' ? 3 : 4);
     assert.ok(room.openings.some((opening) => opening.type === 'door'));
     assert.ok(room.openings.some((opening) => opening.type === 'window'));
   }
@@ -184,7 +184,7 @@ test('南区储物楼梯使用完整55cm占地，桌面及桌下规划区留在�
 });
 
 for (const templateId of ['thu-4p-loft', 'nanqu1']) {
-  test(`${templateId}：四席直梯位于衣柜朝过道正面，左右镜像且不侵入可用分区`, () => {
+  test(`${templateId}：各席直梯位于衣柜朝过道正面，左右镜像且不侵入可用分区`, () => {
     const room = buildRoom({ templateId });
     const u = room.params.unit;
     const ladders = new Map();
@@ -193,7 +193,7 @@ for (const templateId of ['thu-4p-loft', 'nanqu1']) {
       const ladder = room.fixtures.find((fx) => fx.id === `${owner}.ladder#fx`);
       const wardrobe = room.fixtures.find((fx) => fx.id === `${owner}.wardrobe#fx`);
       const desk = room.fixtures.find((fx) => fx.id === `${owner}.desk#fx`);
-      const right = ['C', 'D'].includes(owner);
+      const right = room.zones.find((z) => z.id === `${owner}.desk`).front === '-x';
       const b = ladder.box;
       ladders.set(owner, b);
       assert.equal(b.w, 10, `${owner} 梯厚应沿x`);
@@ -212,7 +212,7 @@ for (const templateId of ['thu-4p-loft', 'nanqu1']) {
         assert.ok(!overlaps(b, zone.box), `${owner} 直梯侵入可用分区 ${zone.id}`);
       }
     }
-    for (const [leftOwner, rightOwner] of [['A', 'C'], ['B', 'D']]) {
+    for (const [leftOwner, rightOwner] of (templateId === 'nanqu1' ? [['B', 'C']] : [['A', 'C'], ['B', 'D']])) {
       const left = ladders.get(leftOwner);
       const right = ladders.get(rightOwner);
       assert.deepEqual(right, { ...left, x: room.params.room.w - left.x - left.w });
@@ -229,7 +229,7 @@ for (const templateId of ['nanqu', 'nanqu1']) test(`${templateId}：L形桌公�
   for (const owner of room.params.occupants) {
     const desk = room.zones.find((z) => z.id === `${owner}.desk`);
     const fx = room.fixtures.find((f) => f.id === `${owner}.desk#fx`);
-    const right = ['C', 'D'].includes(owner);
+    const right = room.zones.find((z) => z.id === `${owner}.desk`).front === '-x';
     assert.equal(fx.box.w, u.depth);
     assert.ok(desk.box.w <= u.deskDepth);
     const notch = {
@@ -243,7 +243,7 @@ for (const templateId of ['nanqu', 'nanqu1']) test(`${templateId}：L形桌公�
     assert.ok(!overlaps(desk.box, notch), `${owner} 桌面分区进入L形凹口`);
     notches.push(notch);
   }
-  // 锁住其他区域，让规划器在左右四张桌面上实际尝试多种现有物品。
+  // 锁住其他区域，让规划器在左右各张桌面上实际尝试多种现有物品。
   const lockedZones = room.zones.filter((z) => z.slot !== 'desk').map((z) => z.id);
   const items = room.params.occupants.flatMap((owner) =>
     ['laptop', 'lamp', 'box-desk', 'cup', 'keyboard', 'monitor-24'].map((libId) =>

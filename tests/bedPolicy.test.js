@@ -10,7 +10,6 @@ import { intersects } from '../src/planner/geometry.js';
 import { assertValidPlacements } from './helpers.js';
 
 const TEMPLATES = ['thu-4p-loft', 'nanqu', 'nanqu1'];
-const OWNERS = ['A', 'B', 'C', 'D'];
 const BED_SLOTS = ['bed', 'bedFoot'];
 const ORDINARY = ['luggage', 'clothes', 'books', 'study', 'electronics', 'appliance',
   'toiletry', 'storage', 'food', 'sport', 'decor', 'misc', 'trash'];
@@ -68,7 +67,7 @@ function assertLayout(room, items, placements, label) {
   assertValidPlacements(room, placements, inside);
 }
 
-for (const templateId of TEMPLATES) for (const owner of OWNERS) {
+for (const templateId of TEMPLATES) for (const owner of buildRoom({ templateId }).params.occupants) {
   test(`${templateId}/${owner}：bed与bedFoot拒绝所有普通类别，旧accepts及强制preferred不能放行`, () => {
     const room = buildRoom({ templateId });
     for (const slot of BED_SLOTS) {

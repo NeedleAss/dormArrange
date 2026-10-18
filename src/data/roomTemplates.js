@@ -51,12 +51,12 @@ const NANQU_PARAMS = {
   sizeSource: 'estimated'
 };
 
-// 新装修 1615–1619：狭长房间、窗旁右侧阳台门、白色直梯、L 桌及分格衣柜。
+// 新装修 1615–1619：右前、左后、右后三床，左前为通高柜区；白色直梯、L 桌及分格衣柜。
 // 桌面靠墙净深 58cm，L 翼外伸到 92cm；由照片比例估计，翼部不增加规划容量。
 /** @type {RoomParams} */
 const NANQU_NEW_PARAMS = {
   templateId: 'nanqu1',
-  name: '清华南区新装修 · 四人间（白梯L形桌）· 估计值',
+  name: '清华南区新装修 · 三人间（白梯L形桌）· 估计值',
   room: { w: 310, d: 630, h: 290 },
   wallT: 10,
   door: { x: 215, w: 85, h: 210 },
@@ -70,7 +70,7 @@ const NANQU_NEW_PARAMS = {
     underDeskSideLen: 40, underDeskBackDepth: 18, underDeskH: 70,
     chairDepth: 45
   },
-  occupants: ['A', 'B', 'C', 'D'],
+  occupants: ['A', 'B', 'C'],
   sizeSource: 'estimated'
 };
 
@@ -80,6 +80,13 @@ const UNIT_SLOTS = [
   { owner: 'B', side: 'L', k: 1 },
   { owner: 'C', side: 'R', k: 0 },
   { owner: 'D', side: 'R', k: 1 }
+];
+
+// 新装修照片 1616 标出后排 2/3 床，1617 显示左前整组柜门：A 右前、B 左后、C 右后。
+const NANQU_NEW_SLOTS = [
+  { owner: 'A', side: 'R', k: 0 },
+  { owner: 'B', side: 'L', k: 1 },
+  { owner: 'C', side: 'R', k: 1 }
 ];
 
 const ZONE_ACCEPTS = {
@@ -154,6 +161,11 @@ export function buildRoom(params = DEFAULT_PARAMS) {
   const p = mergeParams(baseParams, params);
   const southern = p.templateId === 'nanqu';
   const modern = p.templateId === 'nanqu1';
+  if (modern) {
+    // 旧 localStorage 曾存四席参数；按真实三床模板归一，不能恢复第四张床或其桌梯分区。
+    p.occupants = [...NANQU_NEW_PARAMS.occupants];
+    if (p.name === '清华南区新装修 · 四人间（白梯L形桌）· 估计值') p.name = NANQU_NEW_PARAMS.name;
+  }
   const shapedDesk = southern || modern;
   if (shapedDesk) checkTemplateGeometry(p);
   const W = p.room.w, D = p.room.d, H = p.room.h;
@@ -174,8 +186,16 @@ export function buildRoom(params = DEFAULT_PARAMS) {
     });
   };
 
-  // ── 四套单元 ──
-  for (const { owner: o, side, k } of UNIT_SLOTS) {
+  // 左前整组通高柜替代原床位；照片无尺标，仅沿用单元占地估计，内部容量暂不开放。
+  // 不添加地面或桌面分区，避免规划器把固定柜区误判成可堆放的空地。
+  if (modern) {
+    fixtures.push({ id: 'pub.cabinetBank#fx', type: 'wardrobe', owner: 'pub', label: '固定通高柜区',
+      box: box([0, u.wardrobeDepth], [0, u.bedY + u.bedThick + u.railH], [u.startZ, u.startZ + u.len]) });
+  }
+
+  // ── 固定床桌单元：紫荆、南区四套，新装修三套 ──
+  const unitSlots = modern ? NANQU_NEW_SLOTS : UNIT_SLOTS;
+  for (const { owner: o, side, k } of unitSlots) {
     if (!p.occupants.includes(o)) continue;
     const z0 = u.startZ + k * u.len;
     const X = side === 'L' ? (a, b) => [a, b] : (a, b) => [W - b, W - a];
