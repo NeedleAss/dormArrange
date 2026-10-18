@@ -226,7 +226,9 @@ export function normalizeItems(rawText, { owner = 'A', text = '', photo = false 
         powerW,
       };
       if (library) item.libId = library.libId;
+      // AI 未提供有效月份时沿用库的季节设置；明确月份仍以 AI 为准。
       if (months.length) item.months = [...months];
+      else if (base?.months?.length) item.months = [...base.months];
       if (source === 'unknown' || source === 'estimated') item.sizeRange = sizeRange(itemSize, source);
       if (flags.hangable && base?.hang) item.hang = { ...base.hang };
       if (base?.preferred) item.preferred = [...base.preferred];

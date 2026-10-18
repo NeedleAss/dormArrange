@@ -98,6 +98,26 @@ test('物品库选择最长别名，使用库尺寸并保留库标记', () => {
   assert.equal(result.sizeSource, 'product');
 });
 
+test('AI 返回空月份时，外套和夏凉被回退到物品库的季节月份', () => {
+  const { items } = normalize([
+    item({ name: '外套', category: 'clothes', qty: 2, months: [] }),
+    item({ name: '夏凉被', category: 'bedding', months: [] }),
+  ]);
+  assert.deepEqual(items[0].months, makeItem('coat').months);
+  assert.deepEqual(items[1].months, makeItem('coat').months);
+  assert.deepEqual(items[2].months, makeItem('quilt-summer').months);
+  assert.notEqual(items[0].months, items[1].months);
+  items[0].months.push(8);
+  assert.deepEqual(items[1].months, makeItem('coat').months);
+});
+
+test('AI 明确给出非空月份时，保持 AI 月份而不合并物品库默认值', () => {
+  const months = [4, 5, 6];
+  const { items: [result] } = normalize([item({ name: '外套', category: 'clothes', months })]);
+  assert.deepEqual(result.months, months);
+  assert.notDeepEqual(result.months, makeItem('coat').months);
+});
+
 test('24寸显示器不会误匹配为24寸行李箱，明确规格保留 AI 尺寸', () => {
   const size = { w: 55, d: 19, h: 43 };
   const { items: [result] } = normalize([item({
