@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { makeItemMessages } from './prompts.js';
 
 let moduleSequence = 0;
 
@@ -9,7 +10,7 @@ const messages = [
 ];
 
 /** 为每个用例隔离配置缓存、文本缓存和请求队列。 */
-async function mockClient(t, handler, overrides = {}) {
+async function mockClient(t, handler, overrides = {}, configHandler) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   const config = { enabled: true, model: 'test-model', wire: 'chat', vision: false, ...overrides };
@@ -18,7 +19,7 @@ async function mockClient(t, handler, overrides = {}) {
     const url = typeof input === 'string' ? input : input.url;
     const request = { url, init, body: init.body ? JSON.parse(init.body) : undefined };
     calls.push(request);
-    if (url === '/ai/__config') return jsonResponse(config);
+    if (url === '/ai/__config') return configHandler ? configHandler(request) : jsonResponse(config);
     return handler(request);
   };
   t.after(() => { globalThis.fetch = originalFetch; });
@@ -93,6 +94,25 @@ test('responses 没有 output_text 时拼接输出文本片段', async (t) => {
   ] }), { wire: 'responses' });
 
   assert.equal(await client.chat(messages), '{"items":[]}');
+});
+
+test('responses 的 few-shot assistant 使用字符串，用户消息仍使用 input_text', async (t) => {
+  const { client, requests } = await mockClient(t, () => jsonResponse({ output_text: '{"items":[]}' }), { wire: 'responses' });
+  const prompt = makeItemMessages('测试书20本');
+  await client.chat(prompt);
+  const sent = requests()[0].body.input;
+  const assistants = sent.filter(({ role }) => role === 'assistant');
+  assert.ok(assistants.length >= 2);
+  for (const message of assistants) {
+    assert.equal(typeof message.content, 'string');
+    assert.ok(Array.isArray(JSON.parse(message.content).items));
+  }
+  for (const message of sent.filter(({ role }) => role === 'user')) {
+    assert.ok(Array.isArray(message.content));
+    assert.equal(message.content[0].type, 'input_text');
+    assert.equal(typeof message.content[0].text, 'string');
+  }
+  assert.equal(sent.at(-1).content[0].text, '测试书20本');
 });
 
 test('chat 被拒绝 response_format 后移除字段并仅重试一次', async (t) => {
@@ -184,4 +204,92 @@ test('不同文本同时调用时，最多只有一个生成请求在途', async
   assert.equal(results.length, 2);
   assert.equal(requests().length, 2);
   assert.equal(peakActive, 1);
+});
+
+for (const wire of ['chat', 'responses']) {
+  test(`${wire} 图片仅附在最后一条用户消息，且照片请求不缓存`, async (t) => {
+    const image = 'data:image/jpeg;base64,AA==';
+    const photoMessages = [...messages, { role: 'user', content: '识别测试照片' }];
+    const { client, requests } = await mockClient(t, () => wire === 'chat'
+      ? chatResponse('{"items":[]}') : jsonResponse({ output_text: '{"items":[]}' }), { wire });
+
+    await client.chat(photoMessages, { images: [image] });
+    await client.chat(photoMessages, { images: [image] });
+    assert.equal(requests().length, 2);
+    const sent = wire === 'chat' ? requests()[0].body.messages : requests()[0].body.input;
+    const expectedTextType = wire === 'chat' ? 'text' : 'input_text';
+    assert.deepEqual(sent[2].content, [
+      { type: expectedTextType, text: '识别测试照片' },
+      wire === 'chat'
+        ? { type: 'image_url', image_url: { url: image } }
+        : { type: 'input_image', image_url: image },
+    ]);
+    assert.equal(JSON.stringify(sent.slice(0, 2)).includes(image), false);
+  });
+}
+
+for (const [reason, configHandler] of [
+  ['网络不可达', () => { throw new Error('测试网络异常'); }],
+  ['状态非成功', () => jsonResponse({}, 503)],
+  ['非 JSON', () => new Response('测试错误页')],
+]) {
+  test(`配置${reason}时安全返回离线状态`, async (t) => {
+    const { client, calls, requests } = await mockClient(t, () => {
+      assert.fail('配置加载失败时不应请求 AI');
+    }, {}, configHandler);
+
+    assert.equal((await client.getConfig()).enabled, false);
+    await assert.rejects(client.chat(messages), { code: 'DISABLED' });
+    assert.equal(calls.length, 1);
+    assert.equal(requests().length, 0);
+  });
+}
+
+test('配置只保留公开字段并规范无效值', async (t) => {
+  const { client } = await mockClient(t, () => chatResponse(), {
+    enabled: 1, model: null, wire: 'invalid-wire', vision: 'true', extra: '不应透传',
+  });
+  assert.deepEqual(await client.getConfig(), { enabled: false, model: '', wire: 'chat', vision: false });
+});
+
+for (const output of [{}, 'invalid-output', [null, { content: 'invalid-content' }]]) {
+  test(`responses 异常 output 结构 ${JSON.stringify(output)} 返回 BAD_JSON`, async (t) => {
+    const { client } = await mockClient(t, () => jsonResponse({ output }), { wire: 'responses' });
+    await assert.rejects(client.chat(messages), { code: 'BAD_JSON' });
+  });
+}
+
+test('读取响应正文阶段仍受请求截止时间限制', async (t) => {
+  const { client } = await mockClient(t, ({ init }) => {
+    const stream = new ReadableStream({
+      start(controller) {
+        init.signal.addEventListener('abort', () => {
+          controller.error(new DOMException('测试正文读取已中止', 'AbortError'));
+        }, { once: true });
+      },
+    });
+    return new Response(stream);
+  });
+  await assert.rejects(client.chat(messages, { timeoutMs: 10 }), { code: 'TIMEOUT' });
+});
+
+test('失败不缓存且不会阻塞后续请求', async (t) => {
+  let count = 0;
+  const { client, requests } = await mockClient(t, () => {
+    count += 1;
+    return count === 1 ? jsonResponse({}, 503) : chatResponse('{"items":[]}');
+  });
+  await assert.rejects(client.chat(messages), { code: 'HTTP_5XX' });
+  assert.equal(await client.chat(messages), '{"items":[]}');
+  assert.equal(requests().length, 2);
+});
+
+test('同一文本同时调用时复用同一个在途请求', async (t) => {
+  const { client, requests } = await mockClient(t, async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    return chatResponse('{"items":[]}');
+  });
+  const results = await Promise.all([client.chat(messages), client.chat(messages)]);
+  assert.deepEqual(results, ['{"items":[]}', '{"items":[]}']);
+  assert.equal(requests().length, 1);
 });

@@ -42,6 +42,10 @@ function hash(text) {
 function makeBody(messages, config, json, images) {
   const lastUser = messages.findLastIndex((message) => message.role === 'user');
   const converted = messages.map((message, index) => {
+    // Responses 的 few-shot 助手历史使用简化文本消息，不能标成 input_text。
+    if (config.wire === 'responses' && message.role === 'assistant') {
+      return { role: 'assistant', content: String(message.content ?? '') };
+    }
     const parts = [{ type: config.wire === 'chat' ? 'text' : 'input_text', text: String(message.content ?? '') }];
     if (index === lastUser) for (const image of images) {
       parts.push(config.wire === 'chat' ? { type: 'image_url', image_url: { url: image } }
@@ -80,7 +84,7 @@ async function request(messages, { json, timeoutMs, images }) {
     catch { throw failure(controller.signal.aborted ? 'TIMEOUT' : 'BAD_JSON'); }
     const result = config.wire === 'chat' ? data?.choices?.[0]?.message?.content
       : typeof data?.output_text === 'string' ? data.output_text
-        : data?.output?.flatMap((entry) => Array.isArray(entry?.content) ? entry.content : [])
+        : (Array.isArray(data?.output) ? data.output : []).flatMap((entry) => Array.isArray(entry?.content) ? entry.content : [])
           .filter((part) => part?.type === 'output_text' && typeof part.text === 'string').map((part) => part.text).join('');
     if (typeof result !== 'string' || !result.trim()) throw failure('BAD_JSON');
     return result;

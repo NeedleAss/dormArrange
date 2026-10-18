@@ -25,6 +25,8 @@ export default defineConfig(({ mode }) => {
   const basePath = upstream?.pathname.replace(/\/+$/, '') ?? '';
 
   return {
+    // preview 不安装开发中间件，也不得继承带认证的开发代理。
+    preview: { proxy: {} },
     plugins: [{
       name: 'fangcun-ai-config',
       configureServer(server) {
@@ -72,7 +74,7 @@ export default defineConfig(({ mode }) => {
               upstreamRes.pipe(res);
             });
             // Vite 自带日志仅接触这个固定错误，绝不记录上游错误对象。
-            proxy.prependListener('error', (error, _req, res) => {
+            proxy.on('error', (error, _req, res) => {
               error.message = 'AI upstream unavailable';
               error.stack = 'AI upstream unavailable';
               if (res && !res.headersSent && !res.destroyed) reply(res, 502, { code: 'HTTP_5XX' });

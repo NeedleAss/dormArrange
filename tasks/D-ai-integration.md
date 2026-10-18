@@ -27,7 +27,7 @@
 
 ## D2 自然语言导入（15 分钟）
 
-- [ ] `aiParseItems(text, { owner })`：
+- [x] `aiParseItems(text, { owner })`：
   - 提示词要求见 docs/08 §4：只输出 JSON，字段受限
   - 拿到结果后：解析 JSON（容错去掉 ```json 包裹）→ 逐项校验字段、裁剪非法值
   - 与物品库合并：能匹配到 `LIBRARY` 的用库里的尺寸，sizeSource 设为 `'product'`；AI 估计的尺寸设为 `'estimated'`

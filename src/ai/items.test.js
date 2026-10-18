@@ -1,0 +1,234 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { normalizeItems } from './normalize.js';
+import { makeItem } from '../planner/index.js';
+
+const acceptanceText = '24寸行李箱，两床被子，27寸显示器，书20本，1500W电热水壶，一个尺寸不确定的收纳箱';
+
+/** 使用完全合成的模型结果，不需要真实 AI 配置。 */
+function item(overrides = {}) {
+  return {
+    name: '特殊测试物件', qty: 1, category: 'misc', size_cm: { w: 40, d: 20, h: 10 },
+    size_confidence: 'estimated', freq: 'weekly', months: [], power_w: null,
+    hangable: false, stackable: false, compressible: false, note: '', ...overrides,
+  };
+}
+
+function normalize(items, options = {}) {
+  return normalizeItems(JSON.stringify({ items }), options);
+}
+
+function acceptanceItems() {
+  return [
+    item({ name: '24寸行李箱', category: 'luggage', size_cm: { w: 42, d: 26, h: 66 }, size_confidence: 'product', freq: 'rare' }),
+    item({ name: '被子', qty: 2, category: 'bedding', size_cm: { w: 50, d: 40, h: 30 }, freq: 'seasonal', months: [11, 12, 1, 2, 3], stackable: true, compressible: true }),
+    item({ name: '27寸显示器', category: 'electronics', size_cm: { w: 61, d: 20, h: 46 }, size_confidence: 'product', freq: 'daily' }),
+    item({ name: '书', qty: 20, category: 'books', size_cm: { w: 26, d: 19, h: 25 }, stackable: true }),
+    item({ name: '电热水壶', category: 'appliance', size_cm: { w: 22, d: 16, h: 25 }, power_w: 1500, freq: 'daily' }),
+    item({ name: '收纳箱', category: 'storage', size_cm: { w: 44, d: 32, h: 26 }, size_confidence: 'unknown' }),
+  ];
+}
+
+test('六条验收模型结果按数量展开为八个契约物品', () => {
+  const { items, warnings } = normalize(acceptanceItems(), { owner: 'B', text: acceptanceText });
+  assert.equal(items.length, 8);
+  assert.equal(items.filter(({ category }) => category === 'bedding').length, 2);
+  assert.equal(items.filter(({ category }) => category === 'books').length, 2);
+  assert.equal(items.find(({ category }) => category === 'appliance').powerW, 1500);
+  assert.ok(['unknown', 'estimated'].includes(items.at(-1).sizeSource));
+  assert.deepEqual(items.map(({ id }) => id), Array.from({ length: 8 }, (_, index) => `ai-${String(index + 1).padStart(3, '0')}`));
+  assert.ok(items.every(({ owner }) => owner === 'B'));
+  assert.ok(Array.isArray(warnings));
+});
+
+test('21 本书合成三摞，余下一本的高度是 2.5cm', () => {
+  const { items } = normalize([item({ name: '书', category: 'books', qty: 21, size_cm: { w: 26, d: 19, h: 25 } })]);
+  assert.equal(items.length, 3);
+  assert.deepEqual(items.map(({ size }) => size.h), [25, 25, 2.5]);
+  assert.ok(items.every(({ size }) => size.w === 26 && size.d === 19));
+});
+
+test('非法枚举使用默认值，尺寸和数量截断，月份仅保留有效整数', () => {
+  const { items } = normalize([item({
+    name: '不匹配库的测试物件', category: 'invalid', freq: 'invalid', qty: 99,
+    size_cm: { w: -10, d: 800, h: 0 }, months: [0, 1, 12, 13, 2.5, '3', null],
+  })]);
+  assert.equal(items.length, 50);
+  for (const result of items) {
+    assert.equal(result.category, 'misc');
+    assert.equal(result.freq, 'weekly');
+    assert.deepEqual(result.size, { w: 1, d: 250, h: 1 });
+    assert.deepEqual(result.months, [1, 12]);
+  }
+});
+
+test('数量下限为一，不产生零件或负件物品', () => {
+  const { items } = normalize([item({ qty: -4 })]);
+  assert.equal(items.length, 1);
+});
+
+test('只处理模型结果的前六十条', () => {
+  const { items } = normalize(Array.from({ length: 65 }, (_, index) => item({ name: `特殊测试物件${index}` })));
+  assert.equal(items.length, 60);
+  assert.equal(items[59].id, 'ai-060');
+});
+
+test('逐项坏数据被跳过，不丢弃同一批次的有效项', () => {
+  const { items } = normalize([null, [], 3, '错误类型', {}, { name: '' }, item()]);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].name, '特殊测试物件');
+  assert.equal(items[0].id, 'ai-001');
+});
+
+for (const raw of ['不是 JSON', 'null', '[]', '{}', '{"items":{}}']) {
+  test(`非法顶层结果 ${raw} 抛 BAD_JSON`, () => {
+    assert.throws(() => normalizeItems(raw), { code: 'BAD_JSON' });
+  });
+}
+
+test('兼容 Markdown JSON 代码围栏', () => {
+  const raw = `\`\`\`json\n${JSON.stringify({ items: [item()] })}\n\`\`\``;
+  assert.equal(normalizeItems(raw).items.length, 1);
+});
+
+test('物品库选择最长别名，使用库尺寸并保留库标记', () => {
+  const { items: [result] } = normalize([item({ name: '桌面收纳盒', category: 'study' })]);
+  assert.equal(result.libId, 'box-desk');
+  assert.deepEqual(result.size, makeItem('box-desk').size);
+  assert.equal(result.sizeSource, 'product');
+});
+
+test('24寸显示器不会误匹配为24寸行李箱，明确规格保留 AI 尺寸', () => {
+  const size = { w: 55, d: 19, h: 43 };
+  const { items: [result] } = normalize([item({
+    name: '24寸显示器', category: 'electronics', size_cm: size, size_confidence: 'product',
+  })], { text: '24寸显示器' });
+  assert.equal(result.libId, 'monitor-24');
+  assert.deepEqual(result.size, size);
+  assert.equal(result.sizeSource, 'product');
+  assert.equal(result.flags.fragile, true);
+});
+
+test('unknown 尺寸不被物品库标准尺寸与 product 来源覆盖', () => {
+  const size = { w: 43, d: 31, h: 24 };
+  const { items: [result] } = normalize([item({
+    name: '收纳箱', category: 'storage', size_cm: size, size_confidence: 'unknown',
+  })]);
+  assert.equal(result.sizeSource, 'unknown');
+  assert.deepEqual(result.size, size);
+});
+
+test('用户原句中的不确定提示优先于 AI product，但不影响其他物品', () => {
+  const { items } = normalize([
+    item({ name: '收纳箱', category: 'storage', size_confidence: 'product' }),
+    item({ name: '27寸显示器', category: 'electronics', size_cm: { w: 61, d: 20, h: 46 }, size_confidence: 'product' }),
+  ], { text: '一个尺寸不确定的收纳箱，27寸显示器' });
+  assert.ok(['unknown', 'estimated'].includes(items[0].sizeSource));
+  assert.equal(items[1].sizeSource, 'product');
+});
+
+test('照片识别的尺寸来源始终是 estimated，包括库中标准物品', () => {
+  const { items } = normalize([
+    item({ name: '收纳箱', category: 'storage', size_confidence: 'product' }),
+    item({ name: '27寸显示器', category: 'electronics', size_confidence: 'unknown' }),
+  ], { photo: true });
+  assert.ok(items.every(({ sizeSource }) => sizeSource === 'estimated'));
+});
+
+test('调用方 owner 和生成的 id 覆盖模型值，flags 完整且只接受严格布尔值', () => {
+  const { items: [result] } = normalize([item({
+    id: '不可信 id', owner: 'D', hangable: true, stackable: true, compressible: true,
+    flags: { rotatable: false, container: { w: 999, d: 999, h: 999 }, extra: '不透传' },
+  })], { owner: 'pub' });
+  assert.equal(result.owner, 'pub');
+  assert.equal(result.id, 'ai-001');
+  assert.equal(result.flags.stackable, true);
+  assert.equal(result.flags.hangable, true);
+  assert.equal(result.flags.compressible, 0.4);
+  for (const key of ['stackable', 'canBearLoad', 'rotatable', 'canLieDown', 'hangable', 'fragile', 'focusTool', 'disposable']) {
+    assert.equal(typeof result.flags[key], 'boolean', key);
+  }
+  assert.equal(result.flags.rotatable, true);
+  assert.equal(result.flags.extra, undefined);
+  assert.equal(result.flags.container, undefined);
+});
+
+test('字符串布尔值不会被映射为真实物理属性', () => {
+  const { items: [result] } = normalize([item({ hangable: 'true', stackable: 'false', compressible: 'true' })]);
+  assert.equal(result.flags.hangable, false);
+  assert.equal(result.flags.stackable, false);
+  assert.equal(result.flags.compressible, undefined);
+});
+
+for (const [confidence, minFactor, maxFactor] of [['estimated', 0.8, 1.25], ['unknown', 0.5, 2]]) {
+  test(`${confidence} 的 sizeRange 与最终尺寸保持一致`, () => {
+    const { items: [result] } = normalize([item({ size_confidence: confidence })]);
+    assert.ok(result.sizeRange);
+    for (const dimension of ['w', 'd', 'h']) {
+      assert.equal(result.sizeRange.min[dimension], result.size[dimension] * minFactor);
+      assert.equal(result.sizeRange.max[dimension], result.size[dimension] * maxFactor);
+    }
+  });
+}
+
+test('书摞余数改变高度时，同时重算 unknown 的高度范围', () => {
+  const { items } = normalize([item({
+    name: '书', category: 'books', qty: 21, size_cm: { w: 26, d: 19, h: 25 }, size_confidence: 'unknown',
+  })]);
+  assert.equal(items[2].size.h, 2.5);
+  assert.equal(items[2].sizeRange.min.h, 1.25);
+  assert.equal(items[2].sizeRange.max.h, 5);
+});
+
+test('模型只能提供受限字段，不透传原型或额外属性', () => {
+  const raw = JSON.stringify({ items: [item()] });
+  const injected = JSON.parse(raw);
+  injected.items[0] = JSON.parse(`{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}},"unexpected":"禁止透传",${JSON.stringify(injected.items[0]).slice(1)}`);
+  const { items: [result] } = normalizeItems(JSON.stringify(injected));
+  assert.equal(Object.getPrototypeOf(result), Object.prototype);
+  assert.equal(Object.hasOwn(result, '__proto__'), false);
+  assert.equal(Object.hasOwn(result, 'constructor'), false);
+  assert.equal(result.unexpected, undefined);
+  assert.equal(result.polluted, undefined);
+  assert.equal(Object.prototype.polluted, undefined);
+  assert.equal(result.size_cm, undefined);
+  assert.equal(result.qty, undefined);
+  assert.equal(result.power_w, undefined);
+});
+
+test('aiParseItems 模拟 AI 成功、坏 JSON、空结果和服务失败均返回稳定结果', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push(url);
+    if (url === '/ai/__config') return jsonResponse({ enabled: true, model: 'test-model', wire: 'chat', vision: false });
+    const body = JSON.parse(init.body);
+    const text = body.messages.findLast(({ role }) => role === 'user').content;
+    if (text.includes('服务失败测试')) return jsonResponse({}, 503);
+    const content = text.includes('非法结果测试') ? 'not-json'
+      : text.includes('空结果测试') ? '{"items":[]}' : JSON.stringify({ items: acceptanceItems() });
+    return jsonResponse({ choices: [{ message: { content } }] });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const ai = await import('./index.js?items-integration');
+
+  assert.equal(await ai.aiAvailable(), true);
+  const success = await ai.aiParseItems(acceptanceText, { owner: 'C' });
+  assert.equal(success.source, 'ai');
+  assert.equal(success.items.length, 8);
+  assert.ok(success.items.every(({ owner }) => owner === 'C'));
+
+  for (const marker of ['非法结果测试', '空结果测试', '服务失败测试']) {
+    const result = await ai.aiParseItems(`台灯，${marker}`, { owner: 'B' });
+    assert.equal(result.source, 'rules', marker);
+    assert.ok(result.items.some(({ name }) => name.includes('台灯')), marker);
+    assert.ok(result.items.every(({ owner }) => owner === 'B'));
+    assert.ok(result.warnings.includes('AI 离线，已使用本地解析'));
+    if (marker === '非法结果测试') assert.ok(result.warnings.includes('BAD_JSON'));
+  }
+  assert.equal(calls.filter((url) => url === '/ai/__config').length, 1);
+});
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+}
