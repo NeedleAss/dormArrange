@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeItems } from './normalize.js';
-import { makeItem } from '../planner/index.js';
+import { buildRoom, makeItem, planMoveIn } from '../planner/index.js';
 
 const acceptanceText = '24寸行李箱，两床被子，27寸显示器，书20本，1500W电热水壶，一个尺寸不确定的收纳箱';
 
@@ -160,6 +160,27 @@ test('用户原句中的不确定提示优先于 AI product，但不影响其他
   assert.ok(['unknown', 'estimated'].includes(items[0].sizeSource));
   assert.equal(items[1].sizeSource, 'product');
 });
+
+for (const confidence of ['product', 'estimated']) {
+  test(`近似尺寸不被库匹配提升为商品参数（模型 ${confidence}）`, () => {
+    const size = { w: 53, d: 37, h: 31 };
+    const { items } = normalize([
+      item({ name: '收纳箱', category: 'storage', size_cm: size, size_confidence: confidence }),
+      item({ name: '27寸显示器', category: 'electronics', size_confidence: 'product' }),
+      item({ name: '24寸行李箱', category: 'luggage', size_confidence: confidence }),
+    ], { text: '一个大概53×37×31cm的收纳箱，27寸显示器，24寸行李箱外尺寸大约40×25×60cm' });
+    assert.equal(items[0].libId, 'box-l');
+    assert.equal(items[0].sizeSource, 'estimated');
+    assert.deepEqual(items[0].size, size);
+    assert.ok(items[0].sizeRange.min.w < size.w && items[0].sizeRange.max.w > size.w);
+    assert.equal(items[1].sizeSource, 'product');
+    assert.equal(items[2].sizeSource, 'estimated');
+    assert.equal(items[2].flags.container, undefined);
+    const report = planMoveIn(buildRoom(), [items[0]]);
+    assert.equal(report.verdicts[items[0].id].status, 'uncertain');
+    assert.ok(report.verdicts[items[0].id].tolerance);
+  });
+}
 
 test('照片识别的尺寸来源始终是 estimated，包括库中标准物品', () => {
   const { items } = normalize([

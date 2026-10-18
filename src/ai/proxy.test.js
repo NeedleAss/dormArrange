@@ -79,7 +79,12 @@ if (!process.argv.includes(isolatedFlag)) {
         fs: { strict: true, allow: [root] },
       },
     });
-    await server.listen();
+    // Vite 6 的 listen 会把 port:0 回退到 5173；直接绑定底层 HTTP 服务，
+    // 让系统分配临时端口，避免开发服务器或并行副本抢占测试端口。
+    await new Promise((resolve, reject) => {
+      server.httpServer.once('error', reject);
+      server.httpServer.listen(0, '127.0.0.1', resolve);
+    });
     const address = server.httpServer.address();
     assert.equal(typeof address, 'object');
     return { config, logs, port: address.port };

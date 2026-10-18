@@ -171,15 +171,17 @@ export function normalizeItems(rawText, { owner = 'A', text = '', photo = false 
     const base = library ? makeItem(library.libId) : undefined;
     const context = findContext(name, library, fragments, usedFragments);
     const evidence = `${name} ${context}`;
+    const approximate = APPROXIMATE.test(evidence);
     let confidence = ['product', 'estimated', 'unknown'].includes(entry.size_confidence) ? entry.size_confidence : 'estimated';
     if (UNKNOWN.test(evidence)) confidence = 'unknown';
-    else if (APPROXIMATE.test(evidence) && confidence !== 'unknown') confidence = 'estimated';
+    else if (approximate && confidence !== 'unknown') confidence = 'estimated';
     if (photo) confidence = 'estimated';
 
     const defaults = DEFAULT_SIZE[category];
     const defaultSize = base?.size ?? { w: defaults[0], d: defaults[1], h: defaults[2] };
     const aiSize = sizeFrom(entry.size_cm, defaultSize);
-    const useLibrary = Boolean(library && confidence !== 'unknown' && !photo);
+    // 用户说“大概”时保留估计尺寸，不能因命中库别名就提升为商品参数。
+    const useLibrary = Boolean(library && confidence !== 'unknown' && !approximate && !photo);
     const explicitSize = SPECIFICATION.test(evidence);
     const size = useLibrary && !explicitSize ? { ...base.size } : aiSize;
     const source = photo ? 'estimated' : useLibrary ? 'product' : confidence;
@@ -210,7 +212,7 @@ export function normalizeItems(rawText, { owner = 'A', text = '', photo = false 
       const fraction = category === 'books' ? Math.min(10, qty - index * 10) / 10 : 1;
       const itemSize = { ...size, h: Math.max(1, Math.round(size.h * fraction * 100) / 100) };
       const itemFlags = { ...flags };
-      const container = containerFrom(base, itemSize, source === 'unknown' || photo);
+      const container = containerFrom(base, itemSize, source === 'unknown' || source === 'estimated');
       if (container) itemFlags.container = container;
       const item = {
         id: `ai-${String(items.length + 1).padStart(3, '0')}`,
