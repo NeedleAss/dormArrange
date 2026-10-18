@@ -1,0 +1,9 @@
+:root {
+  --bg-0:#050506; --bg-1:#0b0b0e; --bg-2:#15151a; --grid:#2a1d0c;
+  --amber:#ff9a1f; --orange:#ff5a00; --red:#e5161c; --green:#39ff7a; --cyan:#2ee6ff;
+  --purple:#8b5cf6; --white:#f4efe6; --text:#e9e1d4; --muted:#8c8273; --line:rgba(255,154,31,.55);
+  --font-display:"Noto Serif SC","Songti SC",serif;
+  --font-label:"Barlow Condensed","Arial Narrow",sans-serif;
+  --font-mono:"Share Tech Mono",ui-monospace,monospace;
+  --font-body:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+}

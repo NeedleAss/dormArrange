@@ -12,23 +12,23 @@
 
 ## C0 外壳（15 分钟）
 
-- [ ] `index.html` + `src/main.js`。在 main.js 里引入字体：
+- [x] `index.html` + `src/main.js`。在 main.js 里引入字体：
   ```js
   import '@fontsource/noto-serif-sc/900.css';
   import '@fontsource/barlow-condensed/600.css';
   import '@fontsource/barlow-condensed/700.css';
   import '@fontsource/share-tech-mono/400.css';
   ```
-- [ ] `src/styles/tokens.css`：docs/06 §2 的色板，§3 的字体变量。
-- [ ] `src/styles/eva.css`：docs/06 §5 的面板（切角）、警示条、扫描线、六边形底纹、按钮。
-- [ ] 布局：顶栏 48px、左栏 320px（话导航 + 当前面板）、中间 3D 画布、右栏 320px（监视器）、底栏 76px（时间轴/滑块）。
+- [x] `src/styles/tokens.css`：docs/06 §2 的色板，§3 的字体变量。
+- [x] `src/styles/eva.css`：docs/06 §5 的面板（切角）、警示条、扫描线、六边形底纹、按钮。
+- [x] 布局：顶栏 48px、左栏 320px（话导航 + 当前面板）、中间 3D 画布、右栏 320px（监视器）、底栏 76px（时间轴/滑块）。
   - 窗口宽度 < 1280px 时，右栏折叠成抽屉
-- [ ] `src/core/store.js`：
+- [x] `src/core/store.js`：
   - 状态按 docs/03 §5
   - 提供 `get()`、`set(patch)`、`subscribe(fn, keys?)`
   - 初始化时 `room = buildRoom()`
-- [ ] main.js：`createScene(中间容器, { onSelect })` → `scene.setRoom(store.get().room)`。
-- [ ] A0 / B0 还没推送时，用 try/catch 加占位，页面不能白屏。
+- [x] main.js：`createScene(中间容器, { onSelect })` → `scene.setRoom(store.get().room)`。
+- [x] A0 / B0 还没推送时，用 try/catch 加占位，页面不能白屏。
 
 **验收**：`npm run dev` 打开后，能看到 EVA 风格外壳和线框宿舍，控制台无报错。
 
