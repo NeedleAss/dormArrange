@@ -34,13 +34,13 @@
 
 ## C1 开机与标题卡（15 分钟）
 
-- [ ] `src/ui/boot.js`：开机序列。
+- [x] `src/ui/boot.js`：开机序列。
   - 等宽字逐行打印约 2.5s，内容是自编的系统自检文案（见 docs/06 §5.11）
   - 结束后弹出「方寸」标题卡
   - 点击任意处可跳过
-- [ ] `src/ui/titleCard.js`：`showTitleCard({ no, title, en })`，返回 Promise。
+- [x] `src/ui/titleCard.js`：`showTitleCard({ no, title, en })`，返回 Promise。
   - L 形排版，硬切进出，停留 1.4s（docs/06 §4）
-- [ ] 话导航：EP00–EP04 五个按钮，键盘 0–4 对应。切换时先放标题卡，再切换左栏面板。
+- [x] 话导航：EP00–EP04 五个按钮，键盘 0–4 对应。切换时先放标题卡，再切换左栏面板。
 
 ## C2 EP00 建模 + EP01 入住面板（25 分钟）
 

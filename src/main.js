@@ -8,6 +8,8 @@ import { createStore, createInitialState } from './core/store.js';
 import { mountShell, panelHeading } from './ui/shell.js';
 import { bindScene } from './ui/sceneBinder.js';
 import { EPISODES } from './ui/helpers.js';
+import { boot } from './ui/boot.js';
+import { showTitleCard } from './ui/titleCard.js';
 
 // glob 只收集已存在的公开入口，缺席车道不会触发浏览器 404 或构建失败。
 const loaders = import.meta.glob(['./planner/index.js', './scene/index.js', './ai/index.js']);
@@ -29,14 +31,28 @@ try {
 bindScene(store, scene);
 const ai = await load('./ai/index.js');
 if (ai?.aiAvailable) ai.aiAvailable().then(available => store.set({ ai: { ...store.get().ai, available } })).catch(() => {});
-const ctx = { store, scene, planner, ai, alert, footer: shell.footer };
+const ctx = { store, scene, planner, ai, alert, footer: shell.footer, showTitleCard };
+let navigating = false;
+async function navigate(id) {
+  if (navigating || id === store.get().episode) return;
+  navigating = true;
+  const ep = EPISODES.find(e => e.id === id);
+  await showTitleCard({ ...ep, en: `EPISODE ${id.slice(-2)} // ${ep.en}` });
+  store.set({ episode: id });
+  navigating = false;
+}
 function render() {
   const ep = EPISODES.find(e => e.id === store.get().episode);
   shell.panel.innerHTML = panelHeading(ep) + '<div class="panel"><div class="panel-head">SYSTEM READY <b>任务准备</b></div><div class="panel-body"><p>空间蓝图已载入。</p><p class="hint">正在接入本话操作面板。</p></div></div>';
 }
-document.querySelectorAll('[data-episode]').forEach(b => b.onclick = () => store.set({ episode: b.dataset.episode }));
+document.querySelectorAll('[data-episode]').forEach(b => b.onclick = () => navigate(b.dataset.episode));
+document.addEventListener('keydown', event => {
+  if (event.target.closest('input,textarea,select,[contenteditable]') || document.querySelector('.title-card,.boot-screen')) return;
+  if (/^[0-4]$/.test(event.key)) navigate(`EP0${event.key}`);
+});
 store.subscribe(render, ['episode']); render();
 shell.monitor.innerHTML = '<section class="panel"><div class="panel-head">SYNC RATIO <b>同步率</b></div><div class="panel-body"><span class="mono" style="font-size:64px;color:var(--muted)">—</span><p class="hint">完成规划后，生成真实空间评估。</p></div></section><section class="panel"><div class="panel-head">TRIBUNAL <b>三审决议</b></div><div class="panel-body muted">时 / 空 / 心 · 等待首次规划</div></section>';
 alert(planner ? '宿舍模板已载入，尺寸单位 cm。' : '规划模块加载中。');
+await boot({ planner, scene, ai });
 }
 main();
