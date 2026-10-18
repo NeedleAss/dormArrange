@@ -19,9 +19,14 @@ import * as growthPanel from './ui/panels/ep04Growth.js';
 import { mountMonitor } from './ui/widgets/monitor.js';
 import { createFocusTimer } from './ui/widgets/focusTimer.js';
 import { createIdleDemo } from './ui/idleDemo.js';
+import { installErrorBoundary } from './ui/errorBoundary.js';
 import './styles/spatial.css';
 import './styles/monitorDock.css';
 import './styles/typography.css';
+import './styles/errorBoundary.css';
+
+// 在启动链开始前安装兜底，之后连接警报仓库；已有面板始终保留。
+const boundary = installErrorBoundary(document.querySelector('#app'));
 
 // glob 只收集已存在的公开入口，缺席车道不会触发浏览器 404 或构建失败。
 const loaders = import.meta.glob(['./planner/index.js', './scene/index.js', './ai/index.js']);
@@ -32,6 +37,7 @@ const store = createStore(createInitialState(planner));
 try { if (planner && store.get().roomParams) store.set({ room: planner.buildRoom(store.get().roomParams) }); } catch { /* 无效持久化参数回到初始模板。 */ store.set(createInitialState(planner)); }
 const shell = mountShell(document.querySelector('#app'), store);
 const alert = (text, level = 'info') => store.set({ alerts: [{ id: crypto.randomUUID(), level, text, t: new Date().toISOString() }, ...store.get().alerts].slice(0, 6) });
+boundary.connectAlert(alert);
 let scene = null;
 const sceneModule = await load('./scene/index.js');
 try {
@@ -94,4 +100,8 @@ ctx.navigate = navigate;
 ctx.refreshPanel = render;
 createIdleDemo(ctx, { idleMs: 300000 });
 }
-main();
+main().catch(error => {
+  // 启动动画失败时撤下临时遮罩，已挂载的文字面板仍可操作。
+  document.querySelectorAll('.boot-screen,.title-card').forEach(el => el.remove());
+  boundary.failStartup(error);
+});
