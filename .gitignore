@@ -1,0 +1,23 @@
+# 依赖与构建产物
+node_modules/
+dist/
+
+# 密钥：只允许提交 .env.example
+.env
+.env.*
+!.env.example
+*.local
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# 作品包（在仓库外打包上传）
+*.zip
+
+# 个人智能体配置
+CLAUDE.local.md
+.claude/settings.local.json
