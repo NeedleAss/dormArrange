@@ -37,10 +37,9 @@ export function renderTribunalBoard(sync) {
   });
   const label = `三审决议：${votes.map(vote => `${vote.zh}${vote.status}`).join('，')}`;
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" class="tribunal-board" viewBox="0 0 520 496" width="100%" height="auto" preserveAspectRatio="xMidYMid meet" role="group" aria-label="${esc(label)}" focusable="false">
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="tribunal-board" viewBox="0 0 520 496" width="100%" height="496" preserveAspectRatio="xMidYMid meet" role="group" aria-label="${esc(label)}" focusable="false">
     <title>${esc(label)}</title>
     <defs><filter id="tribunal-frame-glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.4" result="halo"/><feMerge><feMergeNode in="halo"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-    <rect x="0" y="0" width="520" height="496" fill="#000000"/>
     <g fill="none" stroke="${MINT}" stroke-linejoin="miter" stroke-linecap="square" aria-hidden="true">
       <path d="${NETWORK}" stroke-width="13" stroke-opacity="0.055"/>
       <path d="${NETWORK}" stroke-width="7" stroke-opacity="0.17"/>
@@ -53,7 +52,7 @@ export function renderTribunalBoard(sync) {
         <title>${esc(description)}</title>
         <text class="tribunal-label" x="${vote.labelX}" y="${vote.labelY}" text-anchor="middle" dominant-baseline="central" fill="${ORANGE}" font-size="22" font-family="${esc(LABEL)}" font-weight="700" letter-spacing="0.7"><tspan font-family="${esc(DISPLAY)}" font-size="21" font-weight="900">${vote.zh}</tspan><tspan dx="9">${vote.en}</tspan></text>
         <rect x="${vote.x}" y="${vote.y}" width="${vote.w}" height="${vote.h}" rx="5" fill="none" stroke="${vote.color}" stroke-width="8" stroke-opacity="0.07" aria-hidden="true"/>
-        <rect x="${vote.x}" y="${vote.y}" width="${vote.w}" height="${vote.h}" rx="5" fill="#000000" stroke="${vote.color}" stroke-width="2.2" aria-hidden="true"/>
+        <rect x="${vote.x}" y="${vote.y}" width="${vote.w}" height="${vote.h}" rx="5" fill="none" stroke="${vote.color}" stroke-width="2.2" aria-hidden="true"/>
         <text class="tribunal-status" x="${vote.x + vote.w / 2}" y="${vote.y + vote.h / 2 - 1}" text-anchor="middle" dominant-baseline="central" font-family="${esc(DISPLAY)}" font-size="58" font-weight="900" letter-spacing="-2" fill="${vote.color}" stroke="${vote.color}" stroke-width="1.7" stroke-opacity="0.14" paint-order="stroke fill">${vote.status}</text>
       </g>`;
     }).join('')}

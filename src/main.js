@@ -80,7 +80,7 @@ document.addEventListener('keydown', event => {
     const s = store.get(); const zone = s.room?.zones.find(z => z.id === s.selection);
     if (zone && zone.kind !== 'keepClear') store.set({ lockedZones: s.lockedZones.includes(zone.id) ? s.lockedZones.filter(id => id !== zone.id) : [...s.lockedZones, zone.id], movePlan: null });
   }
-  if (event.code === 'Space' && ['EP03', 'EP04'].includes(store.get().episode)) {
+  if (event.code === 'Space' && !event.target.closest('button,summary,a') && ['EP03', 'EP04'].includes(store.get().episode)) {
     event.preventDefault();
     shell.panel.querySelector(store.get().episode === 'EP03' ? '[data-season-play]' : '[data-growth-replay]')?.click();
   }

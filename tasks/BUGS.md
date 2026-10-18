@@ -14,9 +14,9 @@
 - [x] [15:35] [归属车道 B] 乱桌加载后锁定 A.desk，再调用 planFocusField：返回 conflicts/steps/unresolved 均空，但 computeSync(...focusBox).parts.focus 为0；锁定应禁止移动同时保留冲突/未解决提示。C 已在面板阻止对锁定桌面生成指令，并用真实 focus 分数保护净空状态；发现者 C
 - [x] [15:37] [归属车道 B] planMoveIn 对已有锁区快递盒（disposable）即使传 opts.existing 仍先判丢弃并删除 placement；普通锁区物品可通过 existing 保持。请让固定 existing 的位置优先于丢弃建议，或在 verdict 中保留位置并只提示建议。C 不修改引擎；发现者 C
 
-- [ ] [16:25] [归属车道 C] 首页三审 SVG 触发浏览器控制台错误 `Error: <svg> attribute height: Expected length, "auto".`；复现：当前主分支运行 dev，打开首页即出现，EP01/EP02 更新三审时重复。来源为 `src/ui/widgets/tribunal.js:40` 的 `height="auto"`（由 monitor.js 插入）。请去掉非法 SVG 高度属性或改成合法长度，响应式高度由 CSS 负责；发现者 D。
+- [x] [16:25] [归属车道 C] 首页三审 SVG 触发浏览器控制台错误 `Error: <svg> attribute height: Expected length, "auto".`；复现：当前主分支运行 dev，打开首页即出现，EP01/EP02 更新三审时重复。来源为 `src/ui/widgets/tribunal.js:40` 的 `height="auto"`（由 monitor.js 插入）。请去掉非法 SVG 高度属性或改成合法长度，响应式高度由 CSS 负责；发现者 D。
 - [16:27] [D 集成复验] 主分支 32e4be9：npm test 138/138、npm run build 通过；源码及 dist 密钥模式扫描无匹配，只有 .env.example 被跟踪，.env.local 已忽略。浏览器复验新生示例在 AI 超时后自动规则回退到 34 件（22 能放下 / 9 换位置 / 2 尺寸待定 / 0 放不下 / 1 禁止），观众警报只有中文；收纳箱容差可展开。EP02 展开时当前同步率保留 75%，另显预计 100%，7 步包含一次级联。待机演示已走到 EP04，Escape 退出恢复到原 EP02 的物品、同步率和 5/7 进度，且未写入本地档案。D4 完整演示项继续保留未完成：A 的场景入口仍缺席，另待 C 修复上述 SVG 控制台错误；发现者 D。
-- [ ] [16:27] [归属车道 C / 美术] 1280×720、100% 缩放时，右栏三审下方「心 / 时」节点被固定底栏裁切，无法完整同屏展示；复现：EP02 载入乱桌 → 展开并执行 7 步 → 将视口设为 1280×720。与 CHANGES.md 16:11 的待处理要求一致，建议在该尺寸验收时连同同步率区域压缩；发现者 D。
+- [x] [16:27] [归属车道 C / 美术] 1280×720、100% 缩放时，右栏三审下方「心 / 时」节点被固定底栏裁切，无法完整同屏展示；复现：EP02 载入乱桌 → 展开并执行 7 步 → 将视口设为 1280×720。与 CHANGES.md 16:11 的待处理要求一致，建议在该尺寸验收时连同同步率区域压缩；发现者 D。
 - [16:27] [D 集成复验补充] 退出待机后继续执行剩余指令可到 7/7，同步率实测更新为 100%，物品数从 30 变为 29（快递盒已丢弃）；发现者 D。
 - [16:29] [D → C 复验更新] 推送时已同步 C 的 336a8f6 与演示测试 a06d7f7。1280×720 下 EP00 与 EP02 展开力场后，三审节点已完整可见（EP02 三审底部约 y=497，底栏从 y=644 开始），上述裁切项已由新样式解决，请 C 勾选；SVG `height="auto"` 控制台错误仍可复现。当前项目显式运行 `node --test src/ai/*.test.js tests/*.test.js` 为 147 项、144 pass、0 fail、3 todo（零食箱、两摞书、成长快照残留快递盒），build 成功。npm test 也退出 0，但本机新增未跟踪的 dormArrange-test/ 副本会被递归发现并重复计数；D 未修改该目录。
 

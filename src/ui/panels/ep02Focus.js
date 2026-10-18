@@ -139,7 +139,7 @@ export function mount(el, ctx) {
   const onShortcut = event => {
     if (event.target.closest('input,textarea,select,[contenteditable]') || document.querySelector('.title-card,.focus-limit,.boot-screen')) return;
     if (event.key.toLowerCase() === 'f') el.querySelector('#deploy').click();
-    if (event.code === 'Space') { event.preventDefault(); togglePlayback(); }
+    if (event.code === 'Space' && !event.target.closest('button,summary,a')) { event.preventDefault(); togglePlayback(); }
   };
   document.addEventListener('keydown', onShortcut);
   const unsubscribe = store.subscribe(render, ['movePlan', 'stepIndex', 'items', 'focusSpec', 'placements']);

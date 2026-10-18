@@ -1,6 +1,6 @@
 /* 总览常驻：先为完整三审预留高度，分区和警报只使用剩余空间。 */
 .right-rail {
-  --monitor-rail-height: calc(100dvh - 158px);
+  --monitor-rail-height: calc(100dvh - 124px);
   --monitor-note-budget: 0px;
   --monitor-board-height: clamp(200px, calc(var(--monitor-rail-height) - 310px - var(--monitor-note-budget)), 276px);
   display: flex;
@@ -167,6 +167,7 @@
   overflow: visible;
 }
 .right-rail .panel.monitor-fold { position: static; min-width: 0; min-height: 0; margin: 0; }
+.right-rail .monitor-fold:not([open]) > :not(summary) { display: none; }
 .right-rail .panel.monitor-fold[open] { display: block; min-height: 0; overflow: visible; }
 .right-rail .panel.monitor-fold > .panel-head {
   flex: 0 0 24px;
