@@ -24,6 +24,7 @@ export function mount(el, ctx) {
     try {
       const room = planner.buildRoom(next);
       if (room.zones.some(z => Object.values(z.box).some(n => !Number.isFinite(n)) || z.box.w < 0 || z.box.d < 0 || z.box.h < 0)) throw new Error('invalid');
+      if (next.room.w < next.unit.depth * 2 + 70 || room.fixtures.some(f => f.box.x < 0 || f.box.z < 0 || f.box.y < 0 || f.box.x + f.box.w > room.bounds.w || f.box.z + f.box.d > room.bounds.d || f.box.y + f.box.h > room.bounds.h)) throw new Error('invalid');
       store.set({ roomParams: next, room, placements: {}, itemStates: {}, fitReport: null, movePlan: null, tdmPlan: null, sync: null, selection: null });
       if (path !== 'balcony.enabled') { measured.add(path); const source = el.querySelector(`[data-source="${path}"]`); if (source) source.textContent = '实测'; }
     } catch { ctx.alert('这组尺寸无法组成有效宿舍，请检查净高、单元长度和房间尺寸。', 'error'); const input = el.querySelector(`[data-param="${path}"]`); if (input) input.value = valueAt(store.get().roomParams, path); }

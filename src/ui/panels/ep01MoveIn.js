@@ -17,18 +17,20 @@ export function mount(el, ctx) {
   text.oninput = () => { draft = text.value; updateButton(); };
   async function parse() {
     if (!text.value.trim()) return false;
+    const requestedText = text.value;
     store.set({ ai: { ...store.get().ai, busy: true } });
     try {
       const owner = store.get().owner;
       let result;
-      try { result = ai?.aiParseItems ? await ai.aiParseItems(text.value, { owner }) : { items: planner.parseItemsText(text.value, { owner }), source: 'rules', warnings: [] }; }
-      catch { result = { items: planner.parseItemsText(text.value, { owner }), source: 'rules', warnings: [] }; }
+      try { result = ai?.aiParseItems ? await ai.aiParseItems(requestedText, { owner }) : { items: planner.parseItemsText(requestedText, { owner }), source: 'rules', warnings: [] }; }
+      catch { result = { items: planner.parseItemsText(requestedText, { owner }), source: 'rules', warnings: [] }; }
       if (!active) return false;
+      if (text.value !== requestedText) { ctx.alert('清单已更改，请重新解析最新内容。', 'warning'); return false; }
       if (!result.items?.length) { ctx.alert('没有识别到物品，请换一种写法或从物品库添加。', 'warning'); return false; }
-      invalidate(result.items); parsedDraft = text.value;
+      const manualItems = store.get().items.filter(item => item.id.startsWith('manual-'));
+      invalidate([...result.items, ...manualItems]); parsedDraft = requestedText;
       store.set({ ai: { ...store.get().ai, lastSource: result.source, available: result.source === 'ai', busy: false } });
-      ctx.alert(`${result.source === 'ai' ? 'AI' : '本地规则'}解析完成：${result.items.length} 件物品。`);
-      (result.warnings || []).forEach(warning => ctx.alert(warning, 'warning'));
+      ctx.alert(result.source === 'ai' ? `AI 解析完成：${result.items.length} 件物品。` : 'AI 离线，已使用本地解析', result.source === 'ai' ? 'info' : 'warning');
       return true;
     } catch { ctx.alert('解析未完成，已保留上次清单。', 'error'); return false; }
     finally { store.set({ ai: { ...store.get().ai, busy: false } }); }
@@ -38,7 +40,7 @@ export function mount(el, ctx) {
   el.querySelector('#add').onclick = () => {
     const libId = el.querySelector('#library').value; if (!libId) return;
     const item = planner.makeItem(libId, { id: `manual-${crypto.randomUUID()}`, owner: store.get().owner });
-    invalidate([...store.get().items, item]); parsedDraft = text.value;
+    invalidate([...store.get().items, item]);
   };
   el.querySelector('#plan').onclick = async () => {
     if (store.get().ai.busy) return;
@@ -55,6 +57,7 @@ export function mount(el, ctx) {
     if (!active) return;
     el.querySelector('#parse-source').textContent = s.ai.busy ? '正在解析清单…' : s.ai.lastSource ? `${s.ai.lastSource === 'ai' ? 'AI' : '本地规则'}解析 · ${s.items.length} 件物品 · 尺寸均为 cm` : '支持自然语言；AI 离线时自动使用本地规则。';
     el.querySelector('#parse').disabled = s.ai.busy; el.querySelector('#freshman').disabled = s.ai.busy;
+    el.querySelector('#add').disabled = s.ai.busy;
     el.querySelector('#item-editor').innerHTML = s.items.length ? `<details class="item-list"><summary>物品清单 / ${s.items.length} 件 · 展开编辑</summary>${s.items.map(i => `<details class="item-edit" data-item="${esc(i.id)}"><summary>${esc(i.name)} <span class="mono muted">${i.size.w}×${i.size.d}×${i.size.h}</span></summary><label>名称<input value="${esc(i.name)}" data-edit="name" aria-label="${esc(i.name)} 名称"></label><div class="field-grid">${['w','d','h'].map((key,n) => `<label>${['宽','深','高'][n]} cm<input type="number" min="0.1" step="1" value="${i.size[key]}" data-size="${key}" aria-label="${esc(i.name)} ${['宽','深','高'][n]}"></label>`).join('')}</div><div class="button-row"><select data-edit="sizeSource" aria-label="${esc(i.name)} 尺寸来源">${Object.entries(sources).map(([value,label]) => `<option value="${value}" ${i.sizeSource === value ? 'selected' : ''}>${label}</option>`).join('')}</select><button class="btn compact btn-danger" data-remove="${esc(i.id)}">移除</button></div><label>使用频率<select data-edit="freq">${[['daily','每日'],['weekly','每周'],['monthly','每月'],['seasonal','换季'],['rare','很少']].map(([value,label]) => `<option value="${value}" ${i.freq === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label class="hint">活跃月份（逗号分隔；空白为全年）<input data-edit="months" value="${esc(i.months?.join(',') || '')}" placeholder="11,12,1,2,3"></label></details>`).join('')}</details>` : '<p class="hint">先解析清单，或从物品库添加物品。</p>';
     updateButton(); renderResults(s);
   }

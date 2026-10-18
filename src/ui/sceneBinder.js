@@ -10,7 +10,11 @@ export function bindScene(store, scene) {
       store.set({ zoneStatus });
     }
     if (has('zoneStatus')) scene?.setZoneStatus?.(s.zoneStatus);
-    if (has('items', 'placements', 'fitReport')) scene?.setItems?.(s.items, s.placements, { animate: true, overflowIds: s.fitReport?.overflowIds || [] });
+    if (has('items', 'placements', 'fitReport')) {
+      // 丢弃步骤已完成的物品不再进入滞留区；回退步骤时可重新显示。
+      const disposed = new Set((s.movePlan?.steps || []).slice(0, s.stepIndex).filter(step => step.kind === 'dispose').map(step => step.itemId));
+      scene?.setItems?.(s.items.filter(item => !disposed.has(item.id)), s.placements, { animate: true, overflowIds: s.fitReport?.overflowIds || [] });
+    }
     if (has('itemStates')) scene?.setItemStates?.(s.itemStates);
     if (has('camera', 'owner', 'room')) scene?.setCamera?.(s.camera, { owner: s.owner });
     if (has('movePlan', 'stepIndex', 'episode')) {

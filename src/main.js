@@ -13,6 +13,8 @@ import { showTitleCard } from './ui/titleCard.js';
 import * as modelPanel from './ui/panels/ep00Model.js';
 import * as moveInPanel from './ui/panels/ep01MoveIn.js';
 import * as focusPanel from './ui/panels/ep02Focus.js';
+import * as seasonsPanel from './ui/panels/ep03Seasons.js';
+import * as growthPanel from './ui/panels/ep04Growth.js';
 import { mountMonitor } from './ui/widgets/monitor.js';
 import { createFocusTimer } from './ui/widgets/focusTimer.js';
 
@@ -49,7 +51,7 @@ async function navigate(id) {
   navigating = false;
 }
 let activePanel = null;
-const panels = { EP00: modelPanel, EP01: moveInPanel, EP02: focusPanel };
+const panels = { EP00: modelPanel, EP01: moveInPanel, EP02: focusPanel, EP03: seasonsPanel, EP04: growthPanel };
 function render() {
   activePanel?.unmount();
   const ep = EPISODES.find(e => e.id === store.get().episode);

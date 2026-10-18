@@ -18,6 +18,12 @@ export function mount(el, ctx) {
     clearTimeout(fallbackTimer); fallbackTimer = null;
     playing = false; paused = false;
   }
+  function settlePlayback() {
+    const s = store.get(); const plan = s.movePlan;
+    const wasPlaying = playing;
+    stopPlayback();
+    if (wasPlaying && plan) store.set({ placements: planner.applySteps(starts.get(plan) || s.placements, plan.steps, s.stepIndex) });
+  }
   function seek(index) {
     const s = store.get(); const plan = s.movePlan; if (!plan) return;
     stopPlayback();
@@ -67,7 +73,7 @@ export function mount(el, ctx) {
   }
   function updateSpec(w, d) {
     if (!(w > 0 && d > 0 && w <= 200 && d <= 150)) { ctx.alert('请填写有效的专注区宽深。', 'warning'); return; }
-    stopPlayback();
+    settlePlayback();
     el.querySelector('#focus-w').value = w; el.querySelector('#focus-d').value = d;
     store.set({ focusSpec: { zoneId: `${store.get().owner}.desk`, w, d }, movePlan: null, stepIndex: 0, itemStates: {} });
     render(store.get());
@@ -86,9 +92,9 @@ export function mount(el, ctx) {
     ctx.alert(`乱桌已载入：${items.length} 件物品，先展开力场定位冲突。`);
   };
   el.querySelector('#deploy').onclick = () => {
-    const s = store.get();
     try {
-      stopPlayback();
+      settlePlayback();
+      const s = store.get();
       const plan = planner.planFocusField(s.room, s.items, s.placements, s.focusSpec, { lockedZones: s.lockedZones });
       starts.set(plan, clone(s.placements));
       const itemStates = Object.fromEntries(s.items.map(item => [item.id, plan.conflicts.includes(item.id) ? 'conflict' : 'fits']));
@@ -126,10 +132,8 @@ export function mount(el, ctx) {
   cleanup = () => {
     active = false;
     // 场景播放中离开本话时，落到最后已完成步骤，避免视图与仓库分离。
-    const s = store.get(); const plan = s.movePlan;
-    const wasPlaying = playing;
-    stopPlayback(); unsubscribe(); document.removeEventListener('keydown', onShortcut);
-    if (wasPlaying && plan) store.set({ placements: planner.applySteps(starts.get(plan) || s.placements, plan.steps, s.stepIndex) });
+    unsubscribe(); document.removeEventListener('keydown', onShortcut);
+    settlePlayback();
   };
 }
 export function unmount() { cleanup(); }
