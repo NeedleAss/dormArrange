@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeItems } from './normalize.js';
-import { buildRoom, makeItem, planMoveIn } from '../planner/index.js';
+import { buildRoom, makeItem, parseItemsText, planMoveIn } from '../planner/index.js';
+import { forgetChat } from './client.js';
+import { makeItemMessages } from './prompts.js';
 
 const acceptanceText = '24寸行李箱，两床被子，27寸显示器，书20本，1500W电热水壶，一个尺寸不确定的收纳箱';
+const audienceText = '台灯、两摞书、水杯、零食箱、快递盒、耳机';
 
 /** 使用完全合成的模型结果，不需要真实 AI 配置。 */
 function item(overrides = {}) {
@@ -46,6 +49,47 @@ test('21 本书合成三摞，余下一本的高度是 2.5cm', () => {
   assert.equal(items.length, 3);
   assert.deepEqual(items.map(({ size }) => size.h), [25, 25, 2.5]);
   assert.ok(items.every(({ size }) => size.w === 26 && size.d === 19));
+});
+
+for (const text of ['两摞书', '二摞书', '２摞书', '书2摞', '两叠书', '2.0摞书']) {
+  for (const qty of [2, 20]) {
+    test(`原文 ${text} 覆盖模型 qty=${qty}，保持两摞完整高度`, () => {
+      const { items } = normalize([item({ name: '书（一摞）', category: 'books', qty })], { text });
+      assert.equal(items.length, 2);
+      assert.ok(items.every(({ libId, size }) => libId === 'books-10' && size.h === 25));
+    });
+  }
+}
+
+test('原文按本计数时不重复乘十，余数高度和原有数量上限保留', () => {
+  for (const [text, qty, heights] of [
+    ['20本书', 20, [25, 25]],
+    ['20.0本书', 20, [25, 25]],
+    ['21本书', 2, [25, 25, 2.5]],
+    ['十摞书', 10, [25, 25, 25, 25, 25]],
+    ['100本书', 100, [25, 25, 25, 25, 25]],
+  ]) {
+    const { items } = normalize([item({ name: '书', category: 'books', qty })], { text });
+    assert.deepEqual(items.map(({ size }) => size.h), heights, text);
+  }
+});
+
+test('多种书按各自原文分句校正数量，不把前一条的摞数套到下一条', () => {
+  const rows = [item({ name: '教材', category: 'books', qty: 2 }), item({ name: '课外书', category: 'books', qty: 3 })];
+  for (const entries of [rows, [...rows].reverse()]) {
+    const { items } = normalize(entries, { text: '两摞教材、3本课外书' });
+    assert.deepEqual(items.filter(({ name }) => name.startsWith('教材')).map(({ size }) => size.h), [25, 25]);
+    assert.deepEqual(items.filter(({ name }) => name.startsWith('课外书')).map(({ size }) => size.h), [7.5]);
+  }
+});
+
+test('照片和没有匹配原文时不从模型名或库名推断摞数', () => {
+  const books = item({ name: '两摞书', category: 'books', qty: 2, size_cm: { w: 26, d: 19, h: 25 } });
+  for (const options of [{}, { photo: true, text: '两摞书' }]) {
+    const { items } = normalize([books], options);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].size.h, 5);
+  }
 });
 
 test('非法枚举使用默认值，尺寸和数量截断，月份仅保留有效整数', () => {
@@ -314,6 +358,50 @@ test('aiParseItems 模拟 AI 成功、坏 JSON、空结果和服务失败均返�
     }
   }
   assert.equal(calls.filter((url) => url === '/ai/__config').length, 1);
+});
+
+test('互动清单在模型两种数量表示和规则降级下均为七件、两摞书', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const messages = makeItemMessages(audienceText);
+  let mode = 'legacy';
+  let requests = 0;
+  globalThis.fetch = async (url) => {
+    if (url === '/ai/__config') return jsonResponse({ enabled: true, model: 'test-model', wire: 'chat', vision: false });
+    requests += 1;
+    if (mode === 'offline') return jsonResponse({}, 503);
+    const items = [
+      item({ name: '台灯', category: 'electronics' }),
+      item({ name: '书（一摞）', category: 'books', qty: mode === 'legacy' ? 2 : 20 }),
+      item({ name: '水杯', category: 'food' }),
+      item({ name: '零食箱', category: 'food' }),
+      item({ name: '快递盒', category: 'trash' }),
+      item({ name: '耳机', category: 'electronics' }),
+    ];
+    return jsonResponse({ choices: [{ message: { content: JSON.stringify({ items }) } }] });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; forgetChat(messages); });
+  const { aiParseItems } = await import('./index.js');
+
+  function assertAudience(items) {
+    assert.equal(items.length, 7);
+    const books = items.filter(({ category }) => category === 'books');
+    assert.equal(books.length, 2);
+    assert.ok(books.every(({ libId, size }) => libId === 'books-10' && size.w === 26 && size.d === 19 && size.h === 25));
+    assert.equal(items.filter(({ libId }) => libId === 'snack-box').length, 1);
+    assert.equal(new Set(items.map(({ id }) => id)).size, 7);
+    assert.ok(items.every(({ owner }) => owner === 'D'));
+  }
+
+  assertAudience(parseItemsText(audienceText, { owner: 'D' }));
+  for (const value of ['legacy', 'canonical', 'offline']) {
+    mode = value;
+    forgetChat(messages);
+    const result = await aiParseItems(audienceText, { owner: 'D' });
+    assert.equal(result.source, value === 'offline' ? 'rules' : 'ai');
+    assertAudience(result.items);
+    if (value === 'offline') assert.ok(result.warnings.includes('AI 离线，已使用本地解析'));
+  }
+  assert.equal(requests, 3);
 });
 
 function jsonResponse(body, status = 200) {

@@ -9,7 +9,7 @@ freq 只能是 daily、weekly、monthly、seasonal、rare。
 尺寸单位为厘米，按立着摆放时的宽 w、深 d、高 h；衣物按折叠后的尺寸；尺寸各维在 1 到 250 之间。
 size_confidence 只能是 product、estimated、unknown。明确规格或标准商品为 product，常识估计为 estimated，无法确定为 unknown，unknown 也给保守估计。
 用户明确说“不确定、不知道、没量过、未知”时，优先标 unknown；“大概、左右、差不多”时标 estimated。此规则优先于商品规格，仅关联相应物品。
-qty 保留原数量，为 1 到 50 的整数，不要展开成多条。书每 10 本在后续合一摞，所以“20 本书”必须是 qty:20，size_cm 给一摞 10 本书的尺寸，通常 26×19×25。
+qty 为 1 到 50 的整数，不要展开成多条。普通物品保留原数量；书的 qty 统一以“本”计，每 10 本在后续合一摞：“20 本书”是 qty:20，“两摞书 / 两叠书”也换算为 qty:20，不能写成 qty:2；书的本数最多50。size_cm 给一摞 10 本书的尺寸，通常 26×19×25，不要提前按本数缩小尺寸。
 months 只填 1 到 12 的整数：冬季通常 [11,12,1,2,3]，夏季通常 [6,7,8,9]，全年物品用 []。
 power_w 使用用户明确给出的额定功率，单位瓦；用户没有提到时用 null，不要自行猜测。
 hangable、stackable、compressible 必须是布尔值；stackable 表示物品上面能否压东西，compressible 表示能否压缩收纳。
@@ -19,7 +19,7 @@ name 保留关键规格并简短命名；note 仅简短补充必要说明。最�
 // 示例覆盖数量、书的原始本数、季节、功率和未知尺寸，字段与正式输出保持一致。
 const EXAMPLES = [
   {
-    user: '24寸行李箱、27寸显示器、书20本',
+    user: '24寸行李箱、27寸显示器、两摞书',
     items: [
       { name: '24寸行李箱', qty: 1, category: 'luggage', size_cm: { w: 42, d: 26, h: 66 }, size_confidence: 'product', freq: 'rare', months: [], power_w: null, hangable: false, stackable: false, compressible: false, note: '' },
       { name: '27寸显示器', qty: 1, category: 'electronics', size_cm: { w: 61, d: 20, h: 46 }, size_confidence: 'product', freq: 'daily', months: [], power_w: null, hangable: false, stackable: false, compressible: false, note: '' },

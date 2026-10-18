@@ -1,4 +1,4 @@
-import { LIBRARY, makeItem } from '../planner/index.js';
+import { LIBRARY, makeItem, parseItemsText } from '../planner/index.js';
 
 const CATEGORIES = new Set(['luggage', 'clothes', 'bedding', 'books', 'study', 'electronics', 'appliance', 'toiletry', 'storage', 'food', 'sport', 'decor', 'trash', 'misc']);
 const FREQUENCIES = new Set(['daily', 'weekly', 'monthly', 'seasonal', 'rare']);
@@ -82,6 +82,21 @@ function findContext(name, library, fragments, used) {
 function bounded(value, fallback, min, max) {
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.max(min, Math.min(max, value)) : fallback;
+}
+
+/** 只从匹配的原文分句恢复书的本数，不把模型已换算的 qty 再乘十。 */
+function bookQuantity(context, fallback) {
+  const counts = [...context.normalize('NFKC').matchAll(/([+-]?\d+(?:\.\d+)?|十几|[零一二两三四五六七八九十百]+)\s*(摞|叠|本)/g)];
+  // 同一分句有多个数量时不猜关联；照片和模型名称也不作为原文证据。
+  if (counts.length !== 1) return fallback;
+  const [, count, unit] = counts[0];
+  const number = Number(count);
+  if (/^[+-]?\d/.test(count) && (!Number.isInteger(number) || number <= 0)) return fallback;
+  if (/^零+$/.test(count)) return fallback;
+  // 借用公开规则解析的中文数字处理；合成一条按摞计的书得到数量，最多产生100条临时 Item。
+  const quantity = Number.isFinite(number) ? String(number) : count;
+  const amount = parseItemsText(`${quantity}摞书`).length;
+  return Math.floor(bounded(amount * (unit === '本' ? 1 : 10), fallback, 1, 50));
 }
 
 function sizeFrom(raw, fallback) {
@@ -185,7 +200,8 @@ export function normalizeItems(rawText, { owner = 'A', text = '', photo = false 
     const explicitSize = SPECIFICATION.test(evidence);
     const size = useLibrary && !explicitSize ? { ...base.size } : aiSize;
     const source = photo ? 'estimated' : useLibrary ? 'product' : confidence;
-    const qty = Math.floor(bounded(entry.qty, 1, 1, 50));
+    const modelQty = Math.floor(bounded(entry.qty, 1, 1, 50));
+    const qty = category === 'books' && !photo ? bookQuantity(context, modelQty) : modelQty;
     const months = Array.isArray(entry.months)
       ? [...new Set(entry.months.filter((month) => Number.isInteger(month) && month >= 1 && month <= 12))] : [];
     const flags = flagsFrom(entry, base?.flags);
@@ -204,7 +220,8 @@ export function normalizeItems(rawText, { owner = 'A', text = '', photo = false 
     }
     if (!CATEGORIES.has(entry.category) || !FREQUENCIES.has(entry.freq)) warnings.add('部分物品分类或使用频率已使用默认值。');
     if (confidence === 'unknown') warnings.add('部分物品尺寸待确认，请测量后校准。');
-    if (qty !== entry.qty) warnings.add('部分物品数量已修正为1至50的整数。');
+    if (modelQty !== entry.qty) warnings.add('部分物品数量已修正为1至50的整数。');
+    if (qty !== modelQty) warnings.add('已按原文的本/摞单位校正书籍数量（最多50本）。');
     if (['w', 'd', 'h'].some((key) => aiSize[key] !== entry.size_cm?.[key])) warnings.add('部分尺寸已修正为有效范围。');
 
     const pieces = category === 'books' ? Math.ceil(qty / 10) : qty;
