@@ -35,15 +35,15 @@
 
 ## B1 几何与放置引擎（25 分钟）
 
-- [ ] `src/planner/geometry.js`：实现 docs/05 §1，包括盒子相交/包含/重叠面积、分区局部坐标 `toLocal` / `toWorld`、`localExtents`。
-- [ ] `src/planner/heightmap.js`：实现 docs/05 §2 的 2.5D 高度图。
+- [x] `src/planner/geometry.js`：实现 docs/05 §1，包括盒子相交/包含/重叠面积、分区局部坐标 `toLocal` / `toWorld`、`localExtents`。
+- [x] `src/planner/heightmap.js`：实现 docs/05 §2 的 2.5D 高度图。
   - 方法：`findSpot`、`commit`、`removeItem`（重建）、`clone`、`blockRect`、`maxEmptyRect`
   - 三种评分模式：store / near / reach
   - 支撑规则：底面支撑率 ≥ 0.6，支撑面必须可承重
   - 遇到 keepClear 分区时，把对应格子封锁
-- [ ] `src/planner/hang.js`：挂杆一维装箱（docs/05 §2.6）。
-- [ ] `src/planner/engines.js`：`buildEngines(room, placements, opts)`，为每个分区建一个引擎，并把已有 placement 填进去。
-- [ ] `tests/engine.test.js`：用固定种子的伪随机（LCG）生成 50 个物品，放进 3 个分区，然后断言：
+- [x] `src/planner/hang.js`：挂杆一维装箱（docs/05 §2.6）。
+- [x] `src/planner/engines.js`：`buildEngines(room, placements, opts)`，为每个分区建一个引擎，并把已有 placement 填进去。
+- [x] `tests/engine.test.js`：用固定种子的伪随机（LCG）生成 50 个物品，放进 3 个分区，然后断言：
   - 两两不重叠
   - 都在分区范围内
   - 不进入 keepClear
