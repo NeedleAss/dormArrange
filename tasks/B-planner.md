@@ -10,6 +10,7 @@
   - 排序一律以 `id` 作为最后的 tie-break
   - 每个算法都有单测
 - **公开 API**：只从 `src/planner/index.js` 导出，签名见 `docs/03-architecture.md` §4.1。
+- **执行顺序（已调整）**：B0 → B1 → **B5 前半**（`parseItemsText` + `PRESETS.freshman`，C/D 车道在 CP1 前要用）→ B2 → B3（同时做 `PRESETS.messyDesk`）→ B4（同时做 `PRESETS.growth`）→ B6。
 
 ---
 
