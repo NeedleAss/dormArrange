@@ -49,6 +49,31 @@ export function mount(el, ctx) {
   }
   const updateButton = () => { el.querySelector('#plan').disabled = store.get().ai.busy || (!store.get().items.length && !text.value.trim()); };
   text.oninput = () => { draft = text.value; updateButton(); };
+  function acceptParsedItems(items, requestedText, owner) {
+    const state = store.get();
+    const fixed = fixedBaseline(state);
+    const manualItems = state.items.filter(item => item.id.startsWith('manual-'));
+    const fixedByIdentity = new Map();
+    for (const item of fixed.items) {
+      const key = manifest.origins.get(item.id) || identity(item);
+      const entries = fixedByIdentity.get(key) || [];
+      entries.push(item);
+      fixedByIdentity.set(key, entries);
+    }
+    const prefix = `parsed-${crypto.randomUUID()}`;
+    const parsedItems = [];
+    items.forEach((item, index) => {
+      const key = identity(item);
+      // 按件消耗已固定的同类物品；同清单重解析不会再添一份，数量增加时只补新增件数。
+      if (fixedByIdentity.get(key)?.shift()) return;
+      const next = { ...clone(item), id: `${prefix}-${index + 1}` };
+      manifest.origins.set(next.id, key);
+      parsedItems.push(next);
+    });
+    invalidate([...parsedItems, ...fixed.items, ...manualItems]);
+    manifest.parsedDraft = requestedText;
+    manifest.owner = owner;
+  }
   async function parse() {
     if (!text.value.trim()) return false;
     const requestedText = text.value;
@@ -63,29 +88,7 @@ export function mount(el, ctx) {
       if (text.value !== requestedText) { ctx.alert('清单已更改，请重新解析最新内容。', 'warning'); return false; }
       if (store.get().owner !== owner) { ctx.alert('使用者已更改，请重新解析清单。', 'warning'); return false; }
       if (!result.items?.length) { ctx.alert('没有识别到物品，请换一种写法或从物品库添加。', 'warning'); return false; }
-      const state = store.get();
-      const fixed = fixedBaseline(state);
-      const manualItems = state.items.filter(item => item.id.startsWith('manual-'));
-      const fixedByIdentity = new Map();
-      for (const item of fixed.items) {
-        const key = manifest.origins.get(item.id) || identity(item);
-        const entries = fixedByIdentity.get(key) || [];
-        entries.push(item);
-        fixedByIdentity.set(key, entries);
-      }
-      const prefix = `parsed-${crypto.randomUUID()}`;
-      const parsedItems = [];
-      result.items.forEach((item, index) => {
-        const key = identity(item);
-        // 按件消耗已固定的同类物品；同清单重解析不会再添一份，数量增加时只补新增件数。
-        if (fixedByIdentity.get(key)?.shift()) return;
-        const next = { ...clone(item), id: `${prefix}-${index + 1}` };
-        manifest.origins.set(next.id, key);
-        parsedItems.push(next);
-      });
-      invalidate([...parsedItems, ...fixed.items, ...manualItems]);
-      manifest.parsedDraft = requestedText;
-      manifest.owner = owner;
+      acceptParsedItems(result.items, requestedText, owner);
       store.set({ ai: { ...store.get().ai, lastSource: result.source, available: result.source === 'ai', busy: false } });
       ctx.alert(result.source === 'ai' ? `AI 解析完成：${result.items.length} 件物品。` : 'AI 离线，已使用本地解析', result.source === 'ai' ? 'info' : 'warning');
       return true;
@@ -93,7 +96,21 @@ export function mount(el, ctx) {
     finally { store.set({ ai: { ...store.get().ai, busy: false } }); }
   }
   el.querySelector('#parse').onclick = parse;
-  el.querySelector('#freshman').onclick = () => { text.value = planner.PRESETS.freshman; draft = text.value; parse(); };
+  el.querySelector('#freshman').onclick = () => {
+    if (store.get().ai.busy) return;
+    text.value = planner.PRESETS.freshman;
+    draft = text.value;
+    try {
+      const owner = store.get().owner;
+      // 固定示例使用确定的本地解析，现场载入不依赖 AI 请求或网络超时。
+      const items = planner.parseItemsText(planner.PRESETS.freshman, { owner });
+      if (!items.length) { ctx.alert('新生示例暂未解析出物品，请从物品库添加。', 'warning'); return; }
+      acceptParsedItems(items, text.value, owner);
+      // 本次没有探测 AI，保留已有在线状态，只更新清单来源与界面。
+      store.set({ ai: { ...store.get().ai, lastSource: 'rules', busy: false } });
+      ctx.alert(`新生示例已载入：${items.length} 件物品（本地解析）。`);
+    } catch { ctx.alert('示例未能载入，已保留上次清单。', 'error'); }
+  };
   el.querySelector('#add').onclick = () => {
     const libId = el.querySelector('#library').value; if (!libId) return;
     const item = planner.makeItem(libId, { id: `manual-${crypto.randomUUID()}`, owner: store.get().owner });
