@@ -1,8 +1,10 @@
-# D 车道 · AI 接入与集成（Claude Code）
+# D 车道 · AI 接入与集成（Codex）
 
 - **拥有**：`vite.config.js`、`src/ai/**`、`.env.example`、`README.md`
 - **规格**：`docs/08-ai-integration.md`。第二批文档到位前，按本卡先做 D1。
 - **安全红线**：key 只存在于 `.env.local` 和开发服务器进程里。不打印 key，不发给前端，不写进任何文件。
+- **独立测试页**：可以建 `src/ai/__dev__.html` + `__dev__.js`（一个文本框 + 按钮，显示解析结果和 source），访问 http://localhost:5173/src/ai/__dev__.html ，不依赖 C 车道外壳。
+- **`.env.local` 由人类手动填写**。智能体不要读取、打印或复制任何 key，也不要去读 `~/.codex` 下的配置文件：对话记录最后要公开。
 
 ---
 

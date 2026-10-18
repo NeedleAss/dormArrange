@@ -35,7 +35,7 @@
 | 时间 | 事件 | 谁 |
 |---|---|---|
 | 13:00–14:30 | 签到、定方向、写框架（本仓库首批提交） | 全队 + 总架构 |
-| 14:30 | 四条车道开工 | A、C：Codex；B、D：Claude Code |
+| 14:30 | 四条车道开工 | A、C、D：Codex；B：Claude Code |
 | 14:40 | **B0 推送**：契约代码、buildRoom、物品库、planner stub | B |
 | 14:50 | **CP0**：外壳 + 线框宿舍可运行 | A、B、C |
 | 15:20 | **CP1**：EP00 + EP01 端到端 | B、C（D 的文字导入接上） |
@@ -55,7 +55,7 @@
 | A 3D 场景 | P1 + Codex | `src/scene/**` |
 | C 界面外壳 + 主演示机 | P2 + Codex | `index.html`、`src/main.js`、`src/core/store.js`、`src/ui/**`、`src/styles/**`、`package.json` |
 | B 规划引擎 | P3 + Claude Code 窗口 1 | `src/core/types.js`、`src/data/**`、`src/planner/**`、`tests/**` |
-| D AI 与集成 | P3 + Claude Code 窗口 2 | `vite.config.js`、`src/ai/**`、`README.md` |
+| D AI 与集成 | P3 + Codex | `vite.config.js`、`src/ai/**`、`README.md` |
 | 讲解人 | 建议 P3 | 熟悉 docs/01 |
 
 ## 6. 审查节奏：怎么用总架构

@@ -21,3 +21,6 @@ Thumbs.db
 # 个人智能体配置
 CLAUDE.local.md
 .claude/settings.local.json
+
+# 本地参考图（第三方图片，只在本机看，绝不提交）
+assets/_ref/

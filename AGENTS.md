@@ -49,7 +49,7 @@
 | **A 3D 场景** | Codex | three.js 渲染：宿舍建模、物品、状态色、三种视角、补间动画、专注力场等特效 | `src/scene/**` | `tasks/A-scene.md` |
 | **B 规划引擎** | Claude Code | 数据类型、宿舍模板生成器、物品库、违章电器规则、放置算法、入住五分类与尺寸容差、最少步腾桌、时分复用、同步率、文本解析、演示预设、单测 | `src/core/types.js` `src/data/**` `src/planner/**` `tests/**` | `tasks/B-planner.md` |
 | **C 界面外壳** | Codex | 入口与布局、状态仓库、EVA 视觉、开机动画、标题卡、各话面板、时间轴；负责把 A/B/D 接起来 | `index.html` `src/main.js` `src/core/store.js` `src/ui/**` `src/styles/**` `public/**` `package.json` | `tasks/C-ui.md` |
-| **D AI 与集成** | Claude Code | vite 代理、AI 客户端、自然语言/照片导入（带离线兜底）、集成测试、README 运行说明 | `vite.config.js` `src/ai/**` `.env.example` `README.md` | `tasks/D-ai-integration.md` |
+| **D AI 与集成** | Codex | vite 代理、AI 客户端、自然语言/照片导入（带离线兜底）、集成测试、README 运行说明 | `vite.config.js` `src/ai/**` `.env.example` `README.md` | `tasks/D-ai-integration.md` |
 | 文档 | 人类 + 总架构 | 方案、契约、任务卡、提交材料 | `docs/**` `tasks/**` `AGENTS.md` `CLAUDE.md` `submission/**` | — |
 
 例外：任何车道都可以在 `tasks/BUGS.md` 和 `tasks/CHANGES.md` **末尾追加**内容，也可以勾选**自己**任务卡上的复选框。
