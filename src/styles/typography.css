@@ -1,0 +1,119 @@
+/* 只引用本机已安装的字体；没有本地字体时使用项目自带的思源宋体。 */
+@font-face {
+  font-family: "Fangcun Song";
+  src: local("Noto Serif SC");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* Black 实例负责粗明朝的横细竖粗，沿用既有标题的纵向字形处理。 */
+@font-face {
+  font-family: "Fangcun Mincho";
+  src: local("Noto Serif SC Black"), local("Noto Serif SC");
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+}
+
+:root {
+  --font-display: "Fangcun Mincho", "Fangcun Song", "Noto Serif SC", "STSong", "SimSun", "PMingLiU", "MingLiU", "PMingLiU-ExtB", "MingLiU-ExtB", serif;
+  --font-body: "Fangcun Song", "Noto Serif SC", "STSong", "SimSun", "PMingLiU-ExtB", "MingLiU-ExtB", serif;
+  --font-label: "Fangcun Song", "Noto Serif SC", "STSong", "SimSun", "PMingLiU-ExtB", "MingLiU-ExtB", serif;
+  --font-reading: "STSong", "SimSun", "Fangcun Song", "Noto Serif SC", "PMingLiU-ExtB", "MingLiU-ExtB", serif;
+  --font-mixed-mono: "Share Tech Mono", "Fangcun Song", "Noto Serif SC", "STSong", "SimSun", ui-monospace, monospace;
+}
+
+body {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-kerning: normal;
+}
+
+.tribunal-board .tribunal-status, .tribunal-board .tribunal-center {
+  font-family: var(--font-display);
+}
+.tribunal-board .tribunal-label, .tribunal-board .tribunal-label tspan {
+  font-family: var(--font-label);
+}
+
+/* 操作层采用中等字重的宋体；只覆盖字形，不改按钮及栏位的几何尺寸。 */
+button, input, select, textarea, summary, label,
+.btn, .section-title, .owner-select, .episode-nav b,
+.rail-label, .system-label, .viewport-top, .micro,
+.panel-head, .camera-controls .btn, .season-tdm b,
+.growth-summary span, .growth-record-label strong {
+  font-family: var(--font-label);
+  font-weight: 600;
+}
+
+.btn, .section-title, .owner-select, .rail-label,
+.viewport-top, .micro, .panel-head {
+  letter-spacing: .035em;
+}
+
+/* 输入正文与密集记录分层：大段宋体保持清楚，小字采用本机华文宋体。 */
+input:not([type="number"]):not([type="range"]), select, textarea,
+.item-edit input[data-edit="name"], .verdict-detail,
+.order-list button, .season-order-list button {
+  font-family: var(--font-body);
+  font-weight: 400;
+}
+
+.hint, .source, .rail-foot, .legend,
+.monitor-zone-title, .monitor-zone-meta, .monitor-note,
+.monitor-vote-notes, .monitor-alert>span,
+.season-status, .season-heat-legend, .season-month-state,
+.growth-record-label small, .growth-current small,
+.focus-limit-note, .focus-limit-speed small {
+  font-family: var(--font-reading);
+  font-weight: 400;
+  letter-spacing: .015em;
+}
+
+/* 话数、标题和关键判定使用粗明朝；字号、行高和纵向拉伸由原组件负责。 */
+.brand strong, .brand-mark, .mission-heading h2, .mission-heading>div>span,
+.viewport-title h1, .title-no, .title-word,
+.cinematic-title .title-no, .cinematic-title .title-word,
+.cinematic-boot .boot-hero h2, .boot-console-head>b,
+.monitor-sync>.panel-head b, .monitor-tribunal>.panel-head b,
+.monitor-vote>span, .monitor-vote strong, .monitor-verdict:not(.pending),
+.focus-limit h2, .growth-current strong, .verdict-group h3 {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-kerning: normal;
+}
+
+.mission-heading h2, .viewport-title h1,
+.title-word, .cinematic-title .title-word, .growth-current strong {
+  letter-spacing: -.055em;
+}
+
+.mission-heading>div>span, .title-no, .cinematic-title .title-no {
+  letter-spacing: -.025em;
+}
+
+/* 这些标签原先继承等宽父级；中文显式交给宋体，时钟及数值节点仍保持原 mono。 */
+.top-status #ai-status, .viewport-top #room-code,
+.monitor-fold>.panel-head b, .monitor-sync-caption {
+  font-family: var(--font-label);
+  font-weight: 600;
+}
+
+.monitor-chart-caption, .growth-chart-caption,
+.focus-limit-progress, .boot-bottom>span, .boot-check-count {
+  font-family: var(--font-mixed-mono);
+}
+
+/* 数字和单位不换字形，保留测量、倒计时与同步率原有的等宽读数。 */
+input[type="number"], .mono,
+.top-status time, .monitor-sync-value, .monitor-sync-unit,
+.monitor-zone-fill, .monitor-alert time,
+.monitor-verdict b, .monitor-verdict b small,
+.focus-limit-digits, .season-month-number, .season-month-state b,
+.season-compare-card>b, .growth-summary strong,
+.growth-record-sync, .growth-node-sync, .blueprint-dimension-label {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}

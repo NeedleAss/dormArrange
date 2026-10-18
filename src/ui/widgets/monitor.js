@@ -45,8 +45,8 @@ export function mountMonitor(el, { store, planner }) {
     </div></section>
     <section class="panel monitor-tribunal"><div class="panel-head"><b>三审决议</b><span>03</span></div><div class="panel-body" data-tribunal></div></section>
     </div><div class="monitor-inspectors">
-    <details class="panel monitor-zones monitor-fold"><summary class="panel-head"><b>分区状态</b><span class="monitor-zone-count">00</span></summary><div class="monitor-zone-summary"></div><div class="monitor-zone-list" aria-label="分区状态列表"></div></details>
-    <details class="panel monitor-alerts monitor-fold" open><summary class="panel-head"><b>警报</b><span class="monitor-alert-count">00</span></summary><ol class="monitor-alert-list" aria-live="polite" aria-relevant="additions text"></ol></details></div>`;
+    <details class="panel monitor-zones monitor-fold" name="monitor-inspector"><summary class="panel-head"><b>分区状态</b><span class="monitor-zone-count">00</span></summary><div class="monitor-zone-summary"></div><div class="monitor-zone-list" aria-label="分区状态列表"></div></details>
+    <details class="panel monitor-alerts monitor-fold" name="monitor-inspector"><summary class="panel-head"><b>警报</b><span class="monitor-alert-count">00</span></summary><ol class="monitor-alert-list" aria-live="polite" aria-relevant="additions text"></ol></details></div>`;
 
   const gauge = el.querySelector('.monitor-gauge');
   const value = el.querySelector('.monitor-sync-value');

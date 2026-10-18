@@ -1,0 +1,238 @@
+/* 总览常驻：先为完整三审预留高度，分区和警报只使用剩余空间。 */
+.right-rail {
+  --monitor-rail-height: calc(100dvh - 158px);
+  --monitor-note-budget: 0px;
+  --monitor-board-height: clamp(200px, calc(var(--monitor-rail-height) - 310px - var(--monitor-note-budget)), 276px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  max-height: 100%;
+  align-self: stretch;
+  padding: 0 14px 10px;
+  overflow: hidden;
+}
+
+/* 只为依据入口预留一行；检查器展开使用局部浮层，不再挤压总览。 */
+.right-rail:has(.monitor-note) { --monitor-note-budget: 22px; }
+
+.right-rail > .rail-label {
+  flex: 0 0 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  line-height: 1;
+}
+
+.right-rail > #monitor-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.right-rail .monitor-overview {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  overflow: visible;
+}
+
+.right-rail .panel.monitor-sync,
+.right-rail .panel.monitor-tribunal {
+  min-width: 0;
+  margin: 0;
+  overflow: visible;
+}
+
+.right-rail .panel.monitor-sync > .panel-head {
+  height: 24px;
+  min-height: 24px;
+  align-items: center;
+}
+.right-rail .panel.monitor-sync > .panel-head b { font-size: 21px; line-height: 1; }
+.right-rail .panel.monitor-sync > .panel-head > span { padding: 2px 6px; font-size: 11px; }
+.right-rail .panel.monitor-sync > .panel-body { padding: 0; }
+
+.right-rail .monitor-gauge {
+  height: clamp(80px, calc(var(--monitor-rail-height) * .154), 116px);
+  margin-top: 2px;
+}
+.right-rail .monitor-sync-orbit {
+  top: 0;
+  right: auto;
+  bottom: auto;
+  left: 0;
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  aspect-ratio: 288 / 162;
+}
+.right-rail .monitor-sync-readout { left: 14px; bottom: 8px; gap: 4px; }
+.right-rail .monitor-sync-value {
+  font-size: clamp(58px, calc(var(--monitor-rail-height) * .111), 70px);
+  line-height: .92;
+}
+.right-rail .monitor-sync-unit { font-size: 18px; }
+.right-rail .monitor-sync-caption {
+  top: auto;
+  right: 4px;
+  bottom: 14px;
+  max-width: 85px;
+  writing-mode: horizontal-tb;
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: .05em;
+}
+
+/* 曲线压到 28px；只改变绘图区纵横比，不丢弃任何历史数值。 */
+.right-rail .monitor-history { height: 28px; margin-top: 0; padding: 0 2px; overflow: hidden; }
+.right-rail .monitor-history .monitor-sparkline {
+  display: block;
+  width: 100%;
+  height: 56px;
+  transform: scaleY(.5);
+  transform-origin: left top;
+}
+.right-rail .monitor-history .monitor-sparkline text {
+  transform: scaleY(2);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.right-rail .monitor-chart-caption { height: 10px; margin-top: 0; font-size: 8px; line-height: 10px; }
+
+.right-rail .panel.monitor-tribunal > .panel-head {
+  height: 22px;
+  min-height: 22px;
+  align-items: center;
+}
+.right-rail .panel.monitor-tribunal > .panel-head b { font-size: 16px; line-height: 1; }
+.right-rail .panel.monitor-tribunal > .panel-head > span { font-size: 20px; }
+.right-rail .panel.monitor-tribunal > .panel-body { display: flex; flex-direction: column; gap: 4px; padding: 0; overflow: visible; }
+.right-rail .monitor-tribunal .tribunal-board {
+  display: block;
+  flex: 0 0 var(--monitor-board-height);
+  width: 100%;
+  height: var(--monitor-board-height);
+  max-height: var(--monitor-board-height);
+  aspect-ratio: 520 / 496;
+  object-fit: contain;
+  overflow: visible;
+}
+.right-rail .monitor-verdict {
+  flex: 0 0 28px;
+  min-height: 28px;
+  margin: 0;
+  padding: 2px 0 2px 8px;
+  line-height: 1.15;
+}
+.right-rail .monitor-verdict b { font-size: 22px; line-height: 1; }
+.right-rail .monitor-verdict b small { font-size: 10px; }
+
+/* 依据按需向上浮出，避免展开长说明时挤走三审或整个右栏。 */
+.right-rail .monitor-note { position: relative; flex: 0 0 18px; height: 18px; min-height: 0; }
+.right-rail .monitor-note > summary { height: 18px; padding: 2px 0; font-size: 10px; line-height: 14px; }
+.right-rail .monitor-note[open] .monitor-vote-notes {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 5px);
+  left: 0;
+  z-index: 8;
+  max-height: min(124px, 18dvh);
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  background: var(--bg-0);
+  box-shadow: 0 4px 20px #000b;
+}
+
+.right-rail .monitor-inspectors {
+  position: relative;
+  display: grid;
+  flex: 0 0 28px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+  min-height: 28px;
+  max-height: 28px;
+  margin-top: auto;
+  overflow: visible;
+}
+.right-rail .panel.monitor-fold { position: static; min-width: 0; min-height: 0; margin: 0; }
+.right-rail .panel.monitor-fold[open] { display: block; min-height: 0; overflow: visible; }
+.right-rail .panel.monitor-fold > .panel-head {
+  flex: 0 0 24px;
+  height: 24px;
+  min-height: 24px;
+  margin: 0;
+  padding: 3px 18px 3px 0;
+  line-height: 18px;
+}
+.right-rail .panel.monitor-fold > .panel-head:after { top: 5px; }
+.right-rail .monitor-fold > .panel-head b { font-size: 11px; line-height: 16px; }
+.right-rail .monitor-fold > .panel-head > span { font-size: 13px; }
+
+/* 原生详情向栏内上方展开；两列各有自己的列表和滚动条，不改变父栏高度。 */
+.right-rail .monitor-fold[open]::details-content {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: clamp(128px, 28dvh, 212px);
+  padding: 7px 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--bg-0);
+  box-shadow: 0 -4px 20px #000b;
+}
+.right-rail .monitor-zone-summary { flex: 0 0 auto; padding: 0 0 2px; font-size: 9px; line-height: 12px; }
+.right-rail .monitor-zone-list,
+.right-rail .monitor-alert-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  padding: 0 3px 2px 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.right-rail .monitor-zone { padding-top: 4px; padding-bottom: 4px; }
+.right-rail .monitor-alert { display: block; padding-top: 4px; padding-bottom: 4px; }
+.right-rail .monitor-alert > time { display: inline-block; margin-right: 5px; }
+.right-rail .monitor-alert > i { display: inline-block; margin: 0; }
+.right-rail .monitor-alert > span { display: block; margin-top: 2px; }
+.right-rail .monitor-alert-empty { padding: 3px 0; font-size: 10px; }
+
+@media (max-width: 1279px) {
+  .right-rail { --monitor-rail-height: calc(100dvh - 151px); display: none; height: auto; max-height: none; }
+  .spatial-console .right-rail.depth-module-monitor { position: fixed; }
+  .right-rail.open { display: flex; }
+}
+@media (max-width: 800px) {
+  .right-rail { --monitor-rail-height: calc(100dvh - 146px); }
+}
+/* 很矮的窗口优先保住约 200px 三审，暂收起曲线装饰与重复刻度。 */
+@media (max-height: 620px) {
+  .right-rail > #monitor-content, .right-rail .monitor-overview { gap: 4px; }
+  .right-rail .monitor-gauge { height: 58px; margin-top: 0; }
+  .right-rail .monitor-sync-value { font-size: 50px; }
+  .right-rail .monitor-sync-readout { bottom: 2px; }
+  .right-rail .monitor-sync-caption { bottom: 8px; }
+  .right-rail .monitor-history, .right-rail .monitor-chart-caption { display: none; }
+  .right-rail .panel.monitor-sync > .panel-head, .right-rail .panel.monitor-tribunal > .panel-head { height: 20px; min-height: 20px; }
+  .right-rail .monitor-verdict { flex-basis: 24px; min-height: 24px; }
+}

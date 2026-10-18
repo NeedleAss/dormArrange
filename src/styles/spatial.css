@@ -1,0 +1,224 @@
+/* 控制台有共同的消失点；侧壁、受光面与接触阴影共同建立厚度。 */
+#app { overflow: hidden; }
+.workspace.spatial-console {
+  position: relative;
+  grid-template-columns: 304px minmax(0, 1fr) 304px;
+  gap: 18px;
+  padding: 14px 18px 20px;
+  perspective: 1800px;
+  perspective-origin: 50% 38%;
+  background:
+    radial-gradient(ellipse at 4% 25%, #7038b538, transparent 38%),
+    radial-gradient(ellipse at 98% 42%, #214e6640, transparent 35%),
+    linear-gradient(165deg, #171325, #050609 40%, #121321);
+}
+.spatial-console::before {
+  content: "";
+  position: absolute;
+  inset: 45% 0 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, #34244755);
+  clip-path: polygon(0 20%, 28% 74%, 74% 74%, 100% 6%, 100% 100%, 0 100%);
+}
+.spatial-console .depth-module {
+  position: relative;
+  min-width: 0;
+  border: 0;
+  transform-style: preserve-3d;
+  isolation: isolate;
+}
+.spatial-console .depth-module-control {
+  transform: rotateY(5.5deg) rotateZ(-.9deg) translateZ(10px);
+  transform-origin: left center;
+  border-radius: 5px 30px 9px 6px;
+  background: linear-gradient(145deg, #29243d, #131523 33%, #0d0f19 82%);
+  box-shadow: inset 1px 2px 1px #a084bc52, inset -2px 0 4px #04050b,
+    7px 13px 0 #171322, 12px 24px 26px #000b, 25px 9px 33px #0008;
+}
+.depth-module-control::before {
+  content: "";
+  position: absolute;
+  inset: 9px -9px -12px 8px;
+  z-index: -1;
+  border-radius: 5px 28px 10px 6px;
+  background: linear-gradient(110deg, #4f386d, #20182f 55%, #08090f);
+  transform: translateZ(-12px);
+}
+.depth-module-control::after {
+  content: "";
+  position: absolute;
+  top: 32px;
+  right: -8px;
+  bottom: 5px;
+  width: 9px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #a061df, #42305b 18%, #171424 80%, #6d416f);
+  clip-path: polygon(0 0, 100% 8px, 100% calc(100% - 10px), 0 100%);
+  box-shadow: 4px 0 13px #000b;
+}
+.depth-module-control > .rail-label {
+  height: 35px;
+  margin: 0 10px;
+  padding: 0 6px;
+  border: 0;
+  color: #d0acd8;
+  background: linear-gradient(115deg, #74518b30, transparent 75%);
+  border-radius: 3px 16px 2px 2px;
+}
+.depth-module-control .panel-host { padding: 0 16px 24px; }
+.spatial-console .depth-module-scene {
+  transform: translateZ(-18px);
+  border-radius: 22px 5px 28px 5px;
+  background:
+    linear-gradient(135deg, #1c233148, transparent 35%),
+    radial-gradient(ellipse at 65% 68%, #4c28643b, transparent 62%), #05070b;
+  box-shadow: inset 0 10px 24px #000c, inset 8px 0 22px #0009,
+    inset -5px 0 18px #0009, 0 9px 0 #181822, 0 18px 22px #000b;
+}
+.spatial-console .depth-module-monitor {
+  transform: rotateY(-5.5deg) rotateZ(.9deg) translateZ(10px);
+  transform-origin: right center;
+  border-radius: 28px 6px 6px 9px;
+  background: linear-gradient(205deg, #26323e, #111823 28%, #090d16 85%);
+  box-shadow: inset -1px 2px 1px #a1d5d44d, inset 2px 0 5px #03080b,
+    -7px 13px 0 #151d27, -13px 24px 26px #000b, -25px 8px 33px #0008;
+}
+.depth-module-monitor::before {
+  content: "";
+  position: absolute;
+  inset: 9px 8px 0 -9px;
+  z-index: -1;
+  border-radius: 27px 5px 6px 9px;
+  background: linear-gradient(250deg, #2d5059, #172532 55%, #080b12);
+  transform: translateZ(-12px);
+}
+.depth-module-monitor::after {
+  content: "";
+  position: absolute;
+  top: 32px;
+  left: -8px;
+  bottom: 5px;
+  width: 9px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #83cfc5, #2b535c 19%, #14212c 80%, #3e5475);
+  clip-path: polygon(100% 0, 0 8px, 0 calc(100% - 10px), 100% 100%);
+  box-shadow: -4px 0 13px #000b;
+}
+
+/* 导航是抬高的控制键，输入区则凹进同一块面板，避免层层描边。 */
+.depth-module-control .episode-nav { margin: 3px 15px 7px; gap: 6px; }
+.episode-nav button {
+  clip-path: none;
+  border-radius: 3px 12px 2px 3px;
+  background: linear-gradient(145deg, #4b3c61, #252338 60%, #1e1c2b);
+  box-shadow: inset 0 1px #ab90c755, 1px 5px 0 #151220, 3px 9px 10px #0009;
+  transform: skewX(-5deg);
+}
+.episode-nav button > * { transform: skewX(5deg); }
+.episode-nav button.active {
+  background: linear-gradient(145deg, #fff2b670, transparent 55%), var(--episode-accent);
+  box-shadow: inset 0 1px #fff8, 1px 5px 0 color-mix(in srgb, var(--episode-accent) 38%, #151220), 3px 10px 14px #0009;
+}
+.episode-nav button::after { content: none; }
+.episode-nav button:not(.active):hover { background: linear-gradient(145deg, #634678, #312c43); }
+.depth-module-control .mission-heading { padding: 14px 0 10px; margin-bottom: 8px; }
+.mission-heading::after { height: 12px; width: 59px; opacity: .8; }
+.module-surface { position: relative; padding-bottom: 8px; }
+.module-surface > .section-title, .module-surface > div > .section-title {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 25px;
+  gap: 15px;
+  padding: 5px 15px 5px 9px;
+  margin: 17px 0 11px -4px;
+  border: 0;
+  border-radius: 3px 12px 1px 2px;
+  background: linear-gradient(110deg, #584264b0, #2a2336 70%, #31253b);
+  color: #eee0f5;
+  box-shadow: 2px 4px 0 #080a13, 3px 7px 10px #0005, inset 0 1px #ae83b54d;
+  transform: skewX(-4deg);
+}
+.module-surface .owner-select { border: 0; padding-top: 3px; }
+.module-surface :is(input:not([type=range]):not([type=checkbox]), select, textarea) {
+  border: 0;
+  border-radius: 3px 9px 3px 3px;
+  background: linear-gradient(140deg, #080b15, #1c1c2d 86%);
+  color: #f0e8de;
+  box-shadow: inset 2px 3px 7px #000c, inset -1px -1px 0 #77628170,
+    0 2px 0 #3c324b66;
+  outline-offset: 3px;
+}
+.module-surface textarea { min-height: 114px; padding: 11px 12px; border-radius: 5px 18px 4px 5px; }
+.module-surface :is(input, textarea, select):focus-visible { outline: 1px solid var(--episode-accent); }
+.module-surface .field-grid {
+  padding: 10px 9px;
+  margin: 2px -3px 7px;
+  border-radius: 12px 4px 12px 3px;
+  background: linear-gradient(145deg, #151827, #22213975);
+  box-shadow: inset 0 1px #b5a0cb12, 0 3px 0 #080b15;
+}
+.module-surface details { border: 0; }
+.module-surface details > summary { padding: 9px 1px; }
+.module-surface .item-edit, .module-surface .verdict-item { border-bottom: 1px solid #aa85bd17; }
+.module-surface .verdict-group { padding: 5px 8px; margin: 12px -4px; border-radius: 15px 4px 9px 4px; background: #080b135c; }
+.module-surface .verdict-group h3 { border: 0; }
+.module-surface .verdict-item > button { background: transparent; }
+.module-surface .btn {
+  border: 0;
+  clip-path: none;
+  border-radius: 3px 9px 2px 3px;
+  background: linear-gradient(155deg, #3c3448, #222334 70%);
+  color: #f0ba72;
+  box-shadow: inset 0 1px #c6a79d40, inset -2px 0 #7d665c50, 1px 4px 0 #080b14, 2px 7px 10px #0007;
+}
+.module-surface .button-row { gap: 10px; margin-bottom: 13px; }
+.module-surface .btn-primary {
+  background: linear-gradient(140deg, #faffc26e, transparent 55%), var(--episode-accent);
+  color: #11100b;
+  box-shadow: inset 0 1px #fff9, inset -4px 0 #0002, 1px 5px 0 color-mix(in srgb, var(--episode-accent) 34%, #090b13), 2px 10px 14px #0009;
+  margin-bottom: 7px;
+}
+.module-surface .focus-presets { gap: 9px; }
+.module-surface .focus-presets .active { color: #100e08; background: linear-gradient(145deg, #ffd2a3, var(--amber) 80%); }
+.module-surface .order-list .current { clip-path: none; border-radius: 3px 13px 3px 3px; box-shadow: -3px 0 0 var(--orange), 2px 4px 8px #0007; }
+.module-surface .hint { color: #c3b4bd; }
+.module-surface :is(.season-month-card, .season-compare-card, .growth-summary, .growth-current, .plan-metrics) {
+  border: 0;
+  clip-path: none;
+  border-radius: 13px 4px 16px 3px;
+  background: linear-gradient(145deg, #3030479c, #111725 75%);
+  box-shadow: inset 0 1px #c4b4d330, 2px 5px 0 #070a12, 4px 9px 12px #0006;
+}
+.viewport-top { top: 17px; left: 24px; right: 24px; }
+.viewport-title { left: 25px; top: 56px; }
+.viewport-title h1 { font-size: clamp(42px, 5vw, 78px); }
+.viewport-bottom { left: 24px; right: 24px; bottom: 20px; }
+.blueprint-caption { left: 24px; }
+.topbar { box-shadow: 0 5px 0 #21182d, 0 9px 14px #000b; z-index: 5; }
+.bottom-bar { box-shadow: 0 -5px 0 #251d33, 0 -9px 15px #0009; border-top: 0; z-index: 5; }
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .episode-nav button:hover { transform: skewX(-5deg) translateY(-2px); }
+  .module-surface .btn:not(:disabled):hover { filter: brightness(1.2); transform: translateY(-1px); }
+  .module-surface .btn:not(:disabled):active { transform: translate(1px, 3px); box-shadow: inset 1px 2px 5px #0005, 0 1px 0 #070912; }
+}
+@media (max-width: 1279px) {
+  .workspace.spatial-console { grid-template-columns: 290px minmax(0, 1fr); padding: 12px 14px 18px; gap: 17px; perspective: none; }
+  .spatial-console .depth-module-control { transform: rotateY(3deg) rotateZ(-.35deg); }
+  .spatial-console .depth-module-monitor { top: 60px; right: 13px; bottom: 91px; width: 304px; transform: none; z-index: 45; }
+  .depth-module-monitor::before, .depth-module-monitor::after { content: none; }
+}
+@media (max-height: 760px) {
+  .depth-module-control .mission-heading { padding-top: 8px; padding-bottom: 6px; margin-bottom: 4px; }
+  .mission-heading h2 { font-size: 34px; padding-bottom: 4px; }
+  .module-surface > .section-title, .module-surface > div > .section-title { margin-top: 12px; }
+}
+@media (max-width: 800px) {
+  .workspace.spatial-console { grid-template-columns: 256px minmax(0, 1fr); padding: 9px 10px 15px; gap: 11px; }
+  .spatial-console .depth-module-control { transform: none; border-radius: 4px 18px 5px 4px; }
+  .depth-module-control::after { width: 6px; right: -5px; }
+  .depth-module-control .panel-host { padding-inline: 12px; }
+  .spatial-console .depth-module-monitor { top: 57px; bottom: 89px; right: 10px; max-width: calc(100vw - 20px); }
+  .viewport-title { left: 17px; }
+  .viewport-title h1 { font-size: 42px; }
+}

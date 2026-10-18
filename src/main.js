@@ -19,6 +19,9 @@ import * as growthPanel from './ui/panels/ep04Growth.js';
 import { mountMonitor } from './ui/widgets/monitor.js';
 import { createFocusTimer } from './ui/widgets/focusTimer.js';
 import { createIdleDemo } from './ui/idleDemo.js';
+import './styles/spatial.css';
+import './styles/monitorDock.css';
+import './styles/typography.css';
 
 // glob 只收集已存在的公开入口，缺席车道不会触发浏览器 404 或构建失败。
 const loaders = import.meta.glob(['./planner/index.js', './scene/index.js', './ai/index.js']);
@@ -62,6 +65,8 @@ function render() {
   shell.footer.innerHTML = '';
   activePanel = panels[ep.id];
   activePanel?.mount(shell.panel.querySelector('#episode-panel'), ctx);
+  // 切话回到顶部，避免沿用上一话操作后留下的滚动位置。
+  shell.panel.scrollTop = 0;
 }
 document.querySelectorAll('[data-episode]').forEach(b => b.onclick = () => navigate(b.dataset.episode));
 document.addEventListener('keydown', event => {
