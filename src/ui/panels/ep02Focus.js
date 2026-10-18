@@ -14,7 +14,7 @@ export function mount(el, ctx) {
   let active = true;
   let fallbackTimer = null;
   const spec = store.get().focusSpec;
-  el.innerHTML = `<button id="messy" class="btn full">载入乱桌示例</button><div class="section-title">专注区尺寸</div><div class="focus-presets">${[[35,25,'仅笔记本'],[75,35,'书 + 笔记本'],[90,40,'双开书 + 笔记本']].map(([w,d,label]) => `<button class="btn compact" data-focus-size="${w},${d}"><span>${label}</span><b class="mono">${w}×${d} cm</b></button>`).join('')}</div><div class="field-grid focus-custom"><label>宽度 cm<input id="focus-w" type="number" min="1" max="200" value="${spec.w}" step="1"></label><label>深度 cm<input id="focus-d" type="number" min="1" max="150" value="${spec.d}" step="1"></label><label>面积 ㎡<output id="focus-area" class="tile-result mono"></output></label></div><button class="btn btn-primary full" id="deploy">展开专注力场</button><div id="orders"></div><button class="btn full" id="start-focus" disabled>开始专注 / 25:00</button><p class="hint">净空后开始专注。</p>`;
+  el.innerHTML = `<button id="messy" class="btn full">载入紫荆乱桌示例</button><p class="hint">此示例使用紫荆固定坐标，载入时恢复紫荆估计尺寸。其他房型可沿用入住结果腾桌。</p><div class="section-title">专注区尺寸</div><div class="focus-presets">${[[35,25,'仅笔记本'],[75,35,'书 + 笔记本'],[90,40,'双开书 + 笔记本']].map(([w,d,label]) => `<button class="btn compact" data-focus-size="${w},${d}"><span>${label}</span><b class="mono">${w}×${d} cm</b></button>`).join('')}</div><div class="field-grid focus-custom"><label>宽度 cm<input id="focus-w" type="number" min="1" max="200" value="${spec.w}" step="1"></label><label>深度 cm<input id="focus-d" type="number" min="1" max="150" value="${spec.d}" step="1"></label><label>面积 ㎡<output id="focus-area" class="tile-result mono"></output></label></div><button class="btn btn-primary full" id="deploy">展开专注力场</button><div id="orders"></div><button class="btn full" id="start-focus" disabled>开始专注 / 25:00</button><p class="hint">净空后开始专注。</p>`;
   function stopPlayback() {
     controller?.stop?.(); controller = null;
     clearTimeout(fallbackTimer); fallbackTimer = null;
@@ -98,10 +98,14 @@ export function mount(el, ctx) {
     if (!preset?.items.length) { ctx.alert('乱桌示例正在准备，暂可沿用入住结果。', 'warning'); return; }
     stopPlayback();
     const items = clone(preset.items); const placements = clone(preset.placements);
-    // 演示预设属于 A；切换 owner 避免在别人的桌面执行指令。
-    store.set({ owner: 'A', focusSpec: { ...store.get().focusSpec, zoneId: 'A.desk' }, items, placements, itemStates: {}, fitReport: null, movePlan: null, stepIndex: 0, tdmPlan: null, selection: 'A.desk' });
+    const switchedTemplate = store.get().roomParams.templateId !== 'thu-4p-loft';
+    // 预设固定在紫荆 A 桌；必须整体重建默认尺寸，不能套进南区或自定义房间。
+    const room = planner.buildRoom({ templateId: 'thu-4p-loft' });
+    store.set({ room, roomParams: clone(room.params), owner: 'A', focusSpec: { zoneId: 'A.desk', w: 75, d: 35 },
+      items, placements, itemStates: {}, fitReport: null, movePlan: null, stepIndex: 0, tdmPlan: null,
+      selection: 'A.desk', lockedZones: [], zoneStatus: {}, sync: null, syncHistory: [] });
     store.set(syncPatch(ctx, placements, '乱桌载入'));
-    ctx.alert(`乱桌已载入：${items.length} 件物品，先展开力场定位冲突。`);
+    ctx.alert(`${switchedTemplate ? '已切换为紫荆估计尺寸。' : ''}紫荆乱桌已载入：${items.length} 件物品，先展开力场定位冲突。`);
   };
   el.querySelector('#deploy').onclick = () => {
     try {
@@ -129,6 +133,7 @@ export function mount(el, ctx) {
   function render(s) {
     if (playing && s.movePlan !== playbackPlan) settlePlayback();
     const plan = s.movePlan;
+    el.querySelector('#focus-w').value = s.focusSpec.w; el.querySelector('#focus-d').value = s.focusSpec.d;
     el.querySelector('#focus-area').value = (s.focusSpec.w * s.focusSpec.d / 10000).toFixed(2);
     el.querySelectorAll('[data-focus-size]').forEach(button => button.classList.toggle('active', button.dataset.focusSize === `${s.focusSpec.w},${s.focusSpec.d}`));
     el.querySelector('#deploy').disabled = !s.items.length || !Object.keys(s.placements).length;
