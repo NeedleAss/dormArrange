@@ -52,12 +52,12 @@
 
 ## B2 第一话 入住：`planMoveIn`（25 分钟）
 
-- [ ] 实现 docs/05 §3 的 `rankZones`。
-- [ ] 实现 docs/05 §4 的放置主流程，包括压缩重试。
-- [ ] 五分类：banned > overflow > uncertain > relocate > fits，按此优先级取一个。
-- [ ] 尺寸容差 `tolerance`（§4.4）和放不下时的 `need`（§4.5，用最大空矩形算）。
-- [ ] 中文原因和建议文案（§4.6）。
-- [ ] `tests/moveIn.test.js`，用 `PRESETS.freshman`，断言：
+- [x] 实现 docs/05 §3 的 `rankZones`。
+- [x] 实现 docs/05 §4 的放置主流程，包括压缩重试。
+- [x] 五分类：banned > overflow > uncertain > relocate > fits，按此优先级取一个。
+- [x] 尺寸容差 `tolerance`（§4.4）和放不下时的 `need`（§4.5，用最大空矩形算）。
+- [x] 中文原因和建议文案（§4.6）。
+- [x] `tests/moveIn.test.js`，用 `PRESETS.freshman`，断言：
   - 电热水壶判为 banned，原因里含"1000W"
   - 24 寸行李箱放进 `A.underDesk`，判为 fits
   - 28 寸行李箱判为 relocate（`pub.entryL`）或 overflow，不能判为 fits

@@ -105,7 +105,7 @@ export class Heightmap {
           if (pen && rectsOverlap({ u0, v0, a: o.a, b: o.b }, pen)) s += 50;
           if (!best || s < best.s - EPS ||
               (Math.abs(s - best.s) <= EPS && (j < best.j || (j === best.j && i < best.i)))) {
-            best = { u0, v0, a: o.a, b: o.b, h: o.h, lying: o.lying, base, s, i, j };
+            best = { u0, v0, a: o.a, b: o.b, h: o.h, lying: o.lying, ka: o.ka, kb: o.kb, kh: o.kh, base, s, i, j };
           }
         }
       }

@@ -8,6 +8,8 @@ export { PRESETS } from '../data/demoPresets.js';
 export { checkRules } from './checkRules.js';
 export { parseItemsText } from './parseText.js';
 export { zoneFill } from './engines.js';
+export { planMoveIn } from './moveIn.js';
+export { computeSync } from './sync.js';
 
 const DEFAULT_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -15,20 +17,6 @@ const DEFAULT_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
 function mockSync() {
   return { total: 0, parts: { fit: 0, access: 0, focus: 0, safety: 1 },
     votes: { time: true, space: false, mind: false }, notes: [] };
-}
-
-/** EP01：规划新生带来的物品放在哪（mock：全部 fits，没有 placement） */
-export function planMoveIn(room, items, opts = {}) {
-  const verdicts = {};
-  for (const it of items) verdicts[it.id] = { status: 'fits', zoneId: undefined, reasons: [], suggestions: [] };
-  return {
-    placements: {},
-    verdicts,
-    summary: { fits: items.length, relocate: 0, uncertain: 0, overflow: 0, banned: 0, total: items.length },
-    overflowIds: [],
-    zoneFill: {},
-    sync: mockSync()
-  };
 }
 
 /** EP02：腾出专注区（mock：steps 为空） */
@@ -80,11 +68,6 @@ export function planSeasons(room, items, opts = {}) {
 /** EP03 辅助：两个月之间的换季步骤（mock：无步骤） */
 export function diffMonths(monthPlanA, monthPlanB, items, room) {
   return [];
-}
-
-/** 同步率与三审决议（mock） */
-export function computeSync(room, items, placements, ctx = {}) {
-  return mockSync();
 }
 
 /** 加分：成长预测（mock） */

@@ -115,24 +115,37 @@ export function uIsWorldX(zone) {
  */
 export function orientations(item, zone, sizeOverride) {
   const s = sizeOverride ?? item.size;
-  const shapes = [{ sx: s.w, sz: s.d, h: s.h, lying: false }];
+  // kx / kz / kh：世界 x、z、y 方向分别对应物品自身的哪一维（容差映射回 w/d/h 时用）
+  const shapes = [{ sx: s.w, sz: s.d, h: s.h, lying: false, kx: 'w', kz: 'd', kh: 'h' }];
   if (item.flags?.canLieDown) {
-    shapes.push({ sx: s.w, sz: s.h, h: s.d, lying: true }, { sx: s.h, sz: s.d, h: s.w, lying: true });
+    shapes.push({ sx: s.w, sz: s.h, h: s.d, lying: true, kx: 'w', kz: 'h', kh: 'd' },
+      { sx: s.h, sz: s.d, h: s.w, lying: true, kx: 'h', kz: 'd', kh: 'w' });
   }
   const ux = uIsWorldX(zone);
   const out = [];
   const seen = new Set();
   for (const sh of shapes) {
-    const worldOpts = [{ sx: sh.sx, sz: sh.sz }];
-    if (item.flags?.rotatable !== false) worldOpts.push({ sx: sh.sz, sz: sh.sx });
+    const worldOpts = [{ sx: sh.sx, sz: sh.sz, kx: sh.kx, kz: sh.kz }];
+    if (item.flags?.rotatable !== false) worldOpts.push({ sx: sh.sz, sz: sh.sx, kx: sh.kz, kz: sh.kx });
     for (const wo of worldOpts) {
       const a = ux ? wo.sx : wo.sz;
       const b = ux ? wo.sz : wo.sx;
       const key = `${a}|${b}|${sh.h}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ a, b, h: sh.h, lying: sh.lying });
+      out.push({ a, b, h: sh.h, lying: sh.lying, ka: ux ? wo.kx : wo.kz, kb: ux ? wo.kz : wo.kx, kh: sh.kh });
     }
   }
   return out;
+}
+
+/**
+ * 桌面默认专注区（docs/05 §5.1）：前沿居中的 w × d 局部矩形及其世界盒子（高度取分区净高）。
+ * @param {Zone} desk
+ */
+export function focusRect(desk, w = 75, d = 35) {
+  const { U, V } = localExtents(desk);
+  const a = Math.min(w, U), b = Math.min(d, V);
+  const rect = { u0: (U - a) / 2, v0: 0, a, b };
+  return { rect, box: toWorld(desk, rect, 0, desk.box.h) };
 }
