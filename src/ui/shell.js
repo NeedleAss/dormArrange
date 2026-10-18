@@ -10,7 +10,7 @@ export function mountShell(root, store) {
       <nav class="episode-nav" aria-label="话导航">${EPISODES.map((ep, i) => `<button data-episode="${ep.id}" aria-label="${ep.no} ${ep.title}"><span>0${i}</span><b>${ep.title}</b></button>`).join('')}</nav>
       <div id="panel" class="panel-host"></div></aside>
     <section class="viewport depth-module depth-module-scene" aria-label="宿舍三维视图"><div id="scene" class="scene"></div>
-      <div class="viewport-top"><span><i class="live-dot"></i> 空间预览</span><span id="room-code">四人间</span></div>
+      <div class="viewport-top"><span><i class="live-dot"></i> 空间预览</span><span id="room-code"></span></div>
       <div class="viewport-title"><span class="micro" id="hero-kicker">EP00 / RECLAIM YOUR SPACE</span><h1 id="hero-title"><em>空间</em><span>重新定义</span></h1></div>
       <div id="scene-placeholder" class="scene-placeholder"><div id="blueprint-host"></div><div class="blueprint-caption"><i></i><b>空间预览</b></div></div>
       <div class="viewport-bottom"><div class="legend"><span style="--c:var(--green)">能放下</span><span style="--c:var(--amber)">需换位置</span><span style="--c:var(--cyan)">尺寸待定</span><span style="--c:var(--red)">冲突 / 滞留</span></div><span class="micro" id="scene-count">0 ITEMS / 0 ZONES</span></div></section>
@@ -30,10 +30,14 @@ export function mountShell(root, store) {
     bloomButton.classList.toggle('active', !!s.bloom);
     bloomButton.setAttribute('aria-pressed', String(!!s.bloom));
     root.querySelector('#scene-count').textContent = `${s.items.length} 件 / ${s.room?.zones.length || 0} 分区`;
+    const params = s.room?.params || s.roomParams;
+    const occupants = params?.occupants?.length || 0;
+    const roomLabel = occupants ? `${({ 1: '单', 2: '双', 3: '三', 4: '四' })[occupants] || occupants}人间` : '宿舍';
+    root.querySelector('#room-code').textContent = `${roomLabel}${params?.templateId === 'nanqu1' && occupants === 3 ? ' · 三床 + 柜区' : ''}`;
     root.querySelector('#ai-status').textContent = s.ai.busy ? '● 解析中' : s.ai.available ? '● AI 在线' : '● 本地';
     root.querySelector('#ai-status').className = s.ai.available ? 'green' : 'muted';
   };
-  store.subscribe(update, ['episode', 'camera', 'bloom', 'items', 'room', 'ai']);
+  store.subscribe(update, ['episode', 'camera', 'bloom', 'items', 'room', 'roomParams', 'ai']);
   update(store.get());
   root.querySelectorAll('[data-camera]').forEach(button => button.onclick = () => store.set({ camera: button.dataset.camera }));
   root.querySelector('#bloom-toggle').onclick = () => store.set({ bloom: !store.get().bloom });

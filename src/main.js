@@ -34,7 +34,13 @@ async function load(path) { try { return await loaders[path]?.(); } catch { retu
 async function main() {
 const planner = await load('./planner/index.js');
 const store = createStore(createInitialState(planner));
-try { if (planner && store.get().roomParams) store.set({ room: planner.buildRoom(store.get().roomParams) }); } catch { /* 无效持久化参数回到初始模板。 */ store.set(createInitialState(planner)); }
+try {
+  if (planner && store.get().roomParams) {
+    const room = planner.buildRoom(store.get().roomParams);
+    // 旧存档先经过模板归一化，再把实际床位和房型名称写回持久化参数。
+    store.set({ room, roomParams: structuredClone(room.params) });
+  }
+} catch { /* 无效持久化参数回到初始模板。 */ store.set(createInitialState(planner)); }
 const shell = mountShell(document.querySelector('#app'), store);
 const alert = (text, level = 'info') => store.set({ alerts: [{ id: crypto.randomUUID(), level, text, t: new Date().toISOString() }, ...store.get().alerts].slice(0, 6) });
 boundary.connectAlert(alert);

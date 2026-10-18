@@ -14,23 +14,32 @@ const groups = [
 ];
 const valueAt = (obj, path) => path.split('.').reduce((o, key) => o?.[key], obj);
 function writeAt(obj, path, value) { const keys = path.split('.'); const last = keys.pop(); keys.reduce((o, key) => o[key], obj)[last] = value; }
+const occupantsOf = s => {
+  const occupants = s.room?.params?.occupants || s.roomParams?.occupants;
+  return Array.isArray(occupants) && occupants.length ? occupants : ['A', 'B', 'C', 'D'];
+};
 
 export function mount(el, ctx) {
   cleanup(); cleanup = () => {};
   const { store, planner } = ctx;
-  if (!planner || !store.get().roomParams) { el.innerHTML = '<p class="empty">规划模块加载中</p>'; return; }
-  const params = store.get().roomParams;
-  const measured = measurements.get(params) || new Set();
+  const params = store.get().room?.params || store.get().roomParams;
+  if (!planner || !params) { el.innerHTML = '<p class="empty">规划模块加载中</p>'; return; }
+  const occupants = occupantsOf(store.get());
+  if (!occupants.includes(store.get().owner)) {
+    const owner = occupants[0];
+    store.set({ owner, focusSpec: { ...store.get().focusSpec, zoneId: `${owner}.desk` }, movePlan: null, stepIndex: 0, selection: null });
+  }
+  const measured = measurements.get(store.get().roomParams) || new Set();
   el.innerHTML = `<div class="section-title">第一步 · 选择宿舍</div>
     <div class="focus-presets" role="group" aria-label="宿舍房型">${templates.map(([id, name, description]) => `<button type="button" class="btn" data-template="${id}" aria-pressed="${params.templateId === id}"><span>${name}</span><small>${description}</small></button>`).join('')}</div>
     <p class="hint" id="template-summary"></p><p class="hint">三种房型尺寸均为估计，请按实际宿舍校准。切换后保留物品清单，清除旧布局并重新规划。</p>
     <div class="section-title">第二步 · 校准尺寸</div>
-    <label class="owner-select">我是谁 <select id="owner">${['A','B','C','D'].map(o => `<option ${o === store.get().owner ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
+    <label class="owner-select">我是谁 <select id="owner">${occupants.map(o => `<option ${o === store.get().owner ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>
     ${groups.map(([title, fields], i) => `<details ${i === 0 ? 'open' : ''}><summary>${title}</summary><div class="field-grid">${fields.map(([path,label]) => `<label>${label}<span class="source" data-source="${path}">${measured.has(path) || params.sizeSource === 'measured' ? '实测' : '估'}</span><input type="number" min="${path.endsWith('.x') || path === 'unit.startZ' ? 0 : 1}" max="3000" step="1" value="${valueAt(params,path)}" data-param="${path}" aria-label="${label} cm"></label>`).join('')}</div>${i === 1 ? `<label class="hint"><input id="balcony" type="checkbox" ${params.balcony.enabled ? 'checked' : ''}> 有阳台</label>` : ''}</details>`).join('')}
     <details><summary>数地砖</summary><div class="field-grid"><label>块数<input id="tile-count" type="number" min="0.1" step="0.5" value="5.5"></label><label>砖长 cm<input id="tile-size" type="number" min="1" step="10" value="60" list="tile-sizes"></label><label>合计 cm<output id="tile-result" class="tile-result mono">330</output></label></div><datalist id="tile-sizes"><option value="60"><option value="80"></datalist><div class="button-row"><select id="tile-target" aria-label="填入尺寸"><option value="room.w">房间净宽</option><option value="room.d">房间进深</option><option value="balcony.d">阳台进深</option><option value="unit.deskLen">桌长</option></select><button class="btn compact" id="tile-apply">填入</button></div></details>
     <div class="section-title">分区状态</div><p class="hint">点名称定位；锁定后不再调整。</p><div id="zone-list"></div>`;
   function rebuild(path, value) {
-    const next = clone(store.get().roomParams);
+    const next = clone(store.get().room?.params || store.get().roomParams);
     writeAt(next, path, value);
     try {
       const room = planner.buildRoom(next);
@@ -41,21 +50,27 @@ export function mount(el, ctx) {
       if (path !== 'balcony.enabled') nextMeasurements.add(path);
       measurements.set(roomParams, nextMeasurements);
       store.set({ roomParams, room, placements: {}, itemStates: {}, fitReport: null, movePlan: null, stepIndex: 0, tdmPlan: null, sync: null, selection: null });
-    } catch { ctx.alert('这组尺寸无法组成有效宿舍，请检查净高、单元长度和房间尺寸。', 'error'); const input = el.querySelector(`[data-param="${path}"]`); if (input) input.value = valueAt(store.get().roomParams, path); }
+    } catch { ctx.alert('这组尺寸无法组成有效宿舍，请检查净高、单元长度和房间尺寸。', 'error'); const input = el.querySelector(`[data-param="${path}"]`); if (input) input.value = valueAt(store.get().room?.params || store.get().roomParams, path); }
   }
   el.querySelectorAll('[data-template]').forEach(button => button.onclick = () => {
-    if (button.dataset.template === store.get().roomParams.templateId) return;
+    if (button.dataset.template === (store.get().room?.params || store.get().roomParams)?.templateId) return;
     try {
       // 只传房型 id，让 B 的新基底提供全部尺寸，避免旧校准值覆盖新模板。
       const room = planner.buildRoom({ templateId: button.dataset.template });
-      store.set({ room, roomParams: clone(room.params), placements: {}, itemStates: {}, fitReport: null,
+      const nextOccupants = occupantsOf({ room });
+      const owner = nextOccupants.includes(store.get().owner) ? store.get().owner : nextOccupants[0];
+      store.set({ room, roomParams: clone(room.params), owner, placements: {}, itemStates: {}, fitReport: null,
         movePlan: null, tdmPlan: null, stepIndex: 0, selection: null, lockedZones: [], zoneStatus: {},
-        sync: null, syncHistory: [], focusSpec: { zoneId: `${store.get().owner}.desk`, w: 75, d: 35 } });
+        sync: null, syncHistory: [], focusSpec: { zoneId: `${owner}.desk`, w: 75, d: 35 } });
       ctx.alert(`已切换为${templates.find(([id]) => id === room.params.templateId)[1]}，尺寸均为估计；请校准后重新规划。`);
     } catch { ctx.alert('房型暂时无法载入，请稍后重试。', 'error'); }
   });
   el.querySelectorAll('[data-param]').forEach(input => input.onchange = () => { if (input.checkValidity() && Number(input.value) > 0) rebuild(input.dataset.param, Number(input.value)); else if (input.checkValidity() && Number(input.value) === 0 && Number(input.min) === 0) rebuild(input.dataset.param, 0); else input.reportValidity(); });
-  el.querySelector('#owner').onchange = event => store.set({ owner: event.target.value, focusSpec: { ...store.get().focusSpec, zoneId: `${event.target.value}.desk` }, movePlan: null });
+  el.querySelector('#owner').onchange = event => {
+    const currentOccupants = occupantsOf(store.get());
+    const owner = currentOccupants.includes(event.target.value) ? event.target.value : currentOccupants[0];
+    store.set({ owner, focusSpec: { ...store.get().focusSpec, zoneId: `${owner}.desk` }, movePlan: null });
+  };
   el.querySelector('#balcony').onchange = event => rebuild('balcony.enabled', event.target.checked);
   const tileResult = () => { el.querySelector('#tile-result').value = Number(el.querySelector('#tile-count').value) * Number(el.querySelector('#tile-size').value); };
   el.querySelector('#tile-count').oninput = tileResult; el.querySelector('#tile-size').oninput = tileResult;
@@ -63,7 +78,7 @@ export function mount(el, ctx) {
     const path = el.querySelector('#tile-target').value;
     const value = Number(el.querySelector('#tile-result').value);
     if (!(value > 0 && value <= 3000)) { ctx.alert('请填写有效的地砖数量和砖长。', 'warning'); return; }
-    rebuild(path, value); el.querySelector(`[data-param="${path}"]`).value = valueAt(store.get().roomParams,path);
+    rebuild(path, value); el.querySelector(`[data-param="${path}"]`).value = valueAt(store.get().room?.params || store.get().roomParams,path);
   };
   const updateZones = s => {
     const fill = planner.zoneFill(s.room, s.items, s.placements);
@@ -74,8 +89,15 @@ export function mount(el, ctx) {
     const lock = event.target.closest('[data-lock]'); if (lock) { const s = store.get(); store.set({ lockedZones: s.lockedZones.includes(lock.dataset.lock) ? s.lockedZones.filter(id => id !== lock.dataset.lock) : [...s.lockedZones, lock.dataset.lock], movePlan: null }); }
   };
   const updateForm = s => {
-    const current = s.roomParams;
-    const sources = measurements.get(current) || new Set();
+    const current = s.room?.params || s.roomParams;
+    if (!current) return;
+    const currentOccupants = occupantsOf(s);
+    if (!currentOccupants.includes(s.owner)) {
+      const owner = currentOccupants[0];
+      store.set({ owner, focusSpec: { ...s.focusSpec, zoneId: `${owner}.desk` }, movePlan: null, stepIndex: 0, selection: null });
+      return;
+    }
+    const sources = measurements.get(s.roomParams) || new Set();
     el.querySelectorAll('[data-param]').forEach(input => { input.value = valueAt(current, input.dataset.param); });
     el.querySelectorAll('[data-source]').forEach(source => { source.textContent = sources.has(source.dataset.source) || current.sizeSource === 'measured' ? '实测' : '估'; });
     el.querySelectorAll('[data-template]').forEach(button => {
@@ -84,9 +106,11 @@ export function mount(el, ctx) {
     });
     el.querySelector('#template-summary').textContent = `当前：${current.name}｜${current.room.w} × ${current.room.d} × ${current.room.h} cm${current.balcony.enabled ? `，阳台进深 ${current.balcony.d} cm` : '，无阳台'}`;
     el.querySelector('#balcony').checked = current.balcony.enabled;
-    el.querySelector('#owner').value = s.owner;
+    const ownerSelect = el.querySelector('#owner');
+    if ([...ownerSelect.options].map(option => option.value).join(',') !== currentOccupants.join(',')) ownerSelect.innerHTML = currentOccupants.map(owner => `<option>${esc(owner)}</option>`).join('');
+    ownerSelect.value = s.owner;
   };
-  const unsubscribeForm = store.subscribe(updateForm, ['roomParams', 'owner']);
+  const unsubscribeForm = store.subscribe(updateForm, ['room', 'roomParams', 'owner']);
   const unsubscribeZones = store.subscribe(updateZones, ['room', 'owner', 'zoneStatus', 'placements']);
   cleanup = () => { unsubscribeForm(); unsubscribeZones(); };
   updateForm(store.get()); updateZones(store.get());
