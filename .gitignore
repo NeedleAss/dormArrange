@@ -24,3 +24,6 @@ CLAUDE.local.md
 
 # 本地参考图（第三方图片，只在本机看，绝不提交）
 assets/_ref/
+
+# 锁文件不入库：每人本地 npm install 各自生成，入库会让其他人 git pull 时冲突
+package-lock.json
