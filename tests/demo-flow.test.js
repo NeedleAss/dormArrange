@@ -165,7 +165,7 @@ test('演示 5 · 成长：每个快照的布局有效', () => {
   }
 });
 
-test('演示 5 · 成长：快照 items 与 placements 一致，不残留已扔掉的物品', { todo: '已知问题 B：growth[3] 仍含已 dispose 的快递盒，见 CHANGES.md [15:28]' }, () => {
+test('演示 5 · 成长：快照 items 与 placements 一致，不残留已扔掉的物品', () => {
   for (const s of PRESETS.growth) {
     for (const it of s.items) {
       if (it.flags.disposable || it.category === 'trash') {

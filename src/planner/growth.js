@@ -30,6 +30,9 @@ export function buildGrowthSnapshots() {
   // ③ ④ 大二上：老生乱桌与腾桌结果
   const { items: items3, placements: pl3 } = DATA_PRESETS.messyDesk;
   const plan = planFocusField(room, items3, pl3);
+  // 腾桌后扔掉的东西不再属于"在场物品"，否则恢复快照时会在滞留区复活
+  const disposed = new Set(plan.steps.filter((st) => st.kind === 'dispose').map((st) => st.itemId));
+  const items4 = items3.filter((it) => !disposed.has(it.id));
 
   const snap = (id, label, semester, createdAt, items, placements, focusMinutes) => ({
     id, label, semester, createdAt, roomParams: params,
@@ -40,7 +43,7 @@ export function buildGrowthSnapshots() {
     snap('snap-1', '大一上 · 入住', 'Y1-F', '2025-09-01T10:00:00+08:00', items1, r1.placements, 0),
     snap('snap-2', '大一下', 'Y1-S', '2026-03-15T21:00:00+08:00', items2, pl2, 1260),
     snap('snap-3', '大二上 · 满桌', 'Y2-F', '2026-10-18T14:00:00+08:00', items3, pl3, 2380),
-    snap('snap-4', '大二上 · 腾桌后', 'Y2-F', '2026-10-18T14:10:00+08:00', items3, plan.placementsAfter, 2380)
+    snap('snap-4', '大二上 · 腾桌后', 'Y2-F', '2026-10-18T14:10:00+08:00', items4, plan.placementsAfter, 2380)
   ];
 }
 
