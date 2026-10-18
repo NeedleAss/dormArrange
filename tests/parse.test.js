@@ -86,3 +86,10 @@ test('"零"单独出现时不是数字：零食、零食箱；与其他数字相
   assert.equal(parseItemsText('书一百零五本').filter((it) => it.category === 'books').length, 11);
   assert.equal(parseItemsText('十几本书').filter((it) => it.category === 'books').length, 2);
 });
+
+test('"摞"按摞数展开，"本"仍按每 10 本一摞', () => {
+  const stacks = parseItemsText('三摞教材').filter((it) => it.category === 'books');
+  assert.deepEqual(stacks.map((b) => b.size.h), [25, 25, 25]);
+  const books = parseItemsText('书15本').filter((it) => it.category === 'books');
+  assert.deepEqual(books.map((b) => b.size.h), [25, 12.5]);
+});

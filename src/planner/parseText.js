@@ -123,9 +123,9 @@ export function parseItemsText(text, opts = {}) {
   for (const frag of frags) {
     const lower = frag.toLowerCase();
     // 数量
-    let qty = 1, qtyText = '';
+    let qty = 1, qtyText = '', qtyUnit = '';
     let m;
-    if ((m = lower.match(RE_QTY))) { qty = +m[1]; qtyText = frag.substr(m.index, m[0].length); }
+    if ((m = lower.match(RE_QTY))) { qty = +m[1]; qtyUnit = m[2]; qtyText = frag.substr(m.index, m[0].length); }
     else if ((m = lower.match(RE_LEAD))) { qty = +m[1]; qtyText = frag.substr(0, m[0].length); }
     else if (!RE_DIMS.test(lower) && (m = lower.match(RE_XQTY))) { qty = +m[1]; qtyText = frag.substr(m.index, m[0].length); }
     qty = Math.max(1, Math.min(qty, 200));
@@ -190,14 +190,16 @@ export function parseItemsText(text, opts = {}) {
     // 展开数量
     if (category === 'books') {
       // 每 10 本合成一摞，最后一摞的高度按余数比例缩小
-      const stacks = Math.ceil(qty / 10);
+      // 单位是"摞"时 qty 就是摞数（每摞完整高度）；"本"或无单位时每 10 本合一摞
+      const byStack = qtyUnit === '摞';
+      const stacks = byStack ? qty : Math.ceil(qty / 10);
       const per = lib ? 10 : 1;          // 未匹配的书类（如"笔记本"）不合摞
       if (per === 1) {
         for (let k = 0; k < qty; k++) out.push(build(nextId(), qty > 1 ? `${name}#${k + 1}` : name, { ...size }));
         continue;
       }
       for (let k = 0; k < stacks; k++) {
-        const rem = qty - k * 10;
+        const rem = byStack ? 10 : qty - k * 10;
         const h = rem >= 10 ? size.h : Math.round(size.h * rem / 10 * 10) / 10;
         out.push(build(nextId(), stacks > 1 ? `${name}#${k + 1}` : name, { ...size, h }));
       }

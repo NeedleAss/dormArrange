@@ -129,7 +129,7 @@ test('演示 3 · 观众口语：「零食箱」应匹配物品库零食箱', ()
   assert.equal(items[0].name, '零食箱');
 });
 
-test('演示 3 · 观众口语：「两摞书」应解析为 2 摞完整的书', { todo: '已知问题 B："摞"被当作本数，见 BUGS.md' }, () => {
+test('演示 3 · 观众口语：「两摞书」应解析为 2 摞完整的书', () => {
   const books = parseItemsText('两摞书').filter((it) => it.category === 'books');
   assert.equal(books.length, 2);
   for (const b of books) assert.equal(b.size.h, 25);
