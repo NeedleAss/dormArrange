@@ -13,7 +13,8 @@ function item(overrides = {}) {
   return {
     name: '特殊测试物件', qty: 1, category: 'misc', size_cm: { w: 40, d: 20, h: 10 },
     size_confidence: 'estimated', freq: 'weekly', months: [], power_w: null,
-    hangable: false, stackable: false, compressible: false, note: '', ...overrides,
+    hangable: false, stackable: false, compressible: false, note: '',
+    safety: { status: 'clear', reason: '普通测试物品，未发现宿舍安全风险。' }, ...overrides,
   };
 }
 

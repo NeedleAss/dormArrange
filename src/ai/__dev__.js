@@ -47,6 +47,7 @@ function showItems(items) {
       size ? `${size.w} × ${size.d} × ${size.h}` : '未知',
       item.sizeSource,
       item.powerW ?? '未知',
+      item.safety ? `${item.safety.status}：${item.safety.reason}` : '本地规则检查（无 AI 结论）',
     ];
     for (const value of values) {
       const cell = document.createElement('td');

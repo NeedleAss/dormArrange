@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { compressPhoto } from './photo.js';
 import { normalizeItems } from './normalize.js';
+import { checkRules } from '../planner/index.js';
 
 const SYNTHETIC_JPEG = 'data:image/jpeg;base64,AA==';
 
@@ -152,11 +153,12 @@ function runPhotoAPI(settings = {}) {
       }));
       requests.push({ url, body: JSON.parse(init.body) });
       if (settings.kind === 'http') return new Response('{}', { status: 503 });
-      const raw = { items: [{
+      const raw = { items: settings.items ?? [{
         name: '27寸显示器', qty: 1, category: 'electronics', size_cm: { w: 40, d: 12, h: 30 },
         size_confidence: 'product', freq: 'daily', months: [], power_w: null,
         hangable: false, stackable: false, compressible: false, note: '桌面物品',
         position_hint: { horizontal: 'left', depth: 'front' },
+        safety: { status: 'clear', reason: '普通显示器，未发现危险用途或成分' },
       }] };
       const text = settings.kind === 'bad-json' ? 'not-json'
         : settings.kind === 'empty' ? '{"items":[]}' : JSON.stringify(raw);
@@ -253,4 +255,105 @@ test('位置提示中的非字符串值被忽略，不影响照片物品', () =>
   }] });
   const { items: [item] } = normalizeItems(raw, { photo: true });
   assert.equal(item.note, '原说明');
+});
+
+/** 安全用例只模拟模型输出；不会访问真实照片或发送网络请求。 */
+function photoSafetyItem(name, safety, overrides = {}) {
+  return {
+    name, qty: 1, category: 'misc', size_cm: { w: 20, d: 15, h: 10 },
+    size_confidence: 'estimated', freq: 'weekly', months: [], power_w: null,
+    hangable: false, stackable: false, compressible: false, note: '',
+    ...(safety === undefined ? {} : { safety }), ...overrides,
+  };
+}
+
+test('照片保留打火机、点火石和燃料原名，明确风险均拦截', () => {
+  const names = ['打火机', '点火石', '丁烷燃料罐'];
+  const { result } = runPhotoAPI({ items: names.map((name) => photoSafetyItem(name, {
+    status: 'blocked', reason: '明火点火或易燃燃料存在火灾风险',
+  })) });
+  assert.equal(result.source, 'ai');
+  assert.deepEqual(result.items.map((item) => item.name), names);
+  for (const item of result.items) {
+    assert.equal(item.safety.status, 'blocked');
+    assert.equal(item.sizeSource, 'estimated');
+    assert.equal(checkRules(item).banned, true);
+  }
+});
+
+test('照片看不清成分的不明试剂标 review，与明确禁用原因区分', () => {
+  const { result } = runPhotoAPI({ items: [photoSafetyItem('不明试剂瓶', {
+    status: 'review', reason: '照片无法确认试剂成分和用途，需要人工核实',
+  })] });
+  const [item] = result.items;
+  assert.equal(item.name, '不明试剂瓶');
+  assert.equal(item.safety.status, 'review');
+  const decision = checkRules(item);
+  assert.equal(decision.banned, true);
+  assert.equal(decision.ruleId, 'R-SAFETY-REVIEW');
+  assert.match(decision.reason, /待核实/);
+});
+
+test('照片模型缺少安全字段时保守 review，不默认为 clear', () => {
+  const { result } = runPhotoAPI({ items: [photoSafetyItem('普通无标签容器', undefined)] });
+  const [item] = result.items;
+  assert.equal(item.safety.status, 'review');
+  assert.equal(typeof item.safety.reason, 'string');
+  assert.ok(item.safety.reason.trim());
+  assert.equal(checkRules(item).ruleId, 'R-SAFETY-REVIEW');
+});
+
+test('照片非法安全结论统一 review，额外字段和原型字段不透传', () => {
+  const invalid = [
+    null, [], { status: 'allowed', reason: '非法枚举', extra: '不得保留' },
+    { status: 'clear', reason: { toString: null }, extra: '不得保留' },
+    { status: 'blocked', reason: '   ', extra: '不得保留' },
+  ];
+  const safe = JSON.parse('{"status":"clear","reason":"普通外壳，未发现风险","extra":"不得保留","__proto__":{"polluted":true},"constructor":"不得保留"}');
+  const { result } = runPhotoAPI({ items: [
+    ...invalid.map((safety, index) => photoSafetyItem(`普通容器${index}`, safety)),
+    photoSafetyItem('普通外壳', safe),
+  ] });
+  assert.equal(result.items.length, invalid.length + 1);
+  for (const item of result.items.slice(0, invalid.length)) {
+    assert.equal(item.safety.status, 'review');
+    assert.equal(checkRules(item).banned, true);
+  }
+  assert.equal(result.items.at(-1).safety.status, 'clear');
+  for (const item of result.items) {
+    assert.deepEqual(Object.keys(item.safety).sort(), ['reason', 'status']);
+    assert.equal(Object.hasOwn(item.safety, '__proto__'), false);
+    assert.equal(item.safety.polluted, undefined);
+  }
+  assert.equal({}.polluted, undefined);
+});
+
+test('照片 AI 的 clear 不能覆盖打火机、电热毯与超功率硬规则', () => {
+  const clear = { status: 'clear', reason: '模型声称未发现风险' };
+  const { result } = runPhotoAPI({ items: [
+    photoSafetyItem('打火机', clear),
+    photoSafetyItem('电热毯', clear, { category: 'appliance' }),
+    photoSafetyItem('1500W电热水壶', clear, { category: 'appliance', power_w: 1500 }),
+  ] });
+  assert.equal(result.items.length, 3);
+  for (const item of result.items) {
+    assert.equal(checkRules(item).banned, true);
+    assert.equal(item.safety.status, 'blocked');
+  }
+});
+
+test('照片中空保护套、科普书、无火LED蜡烛和酒精棉片不因词语误拦截', () => {
+  const cases = [
+    ['打火机保护套', 'misc'], ['打火石科普书', 'books'],
+    ['无火LED蜡烛', 'electronics'], ['酒精棉片', 'toiletry'],
+    ['电热毯保护套', 'bedding'],
+  ];
+  const { result } = runPhotoAPI({ items: cases.map(([name, category]) => photoSafetyItem(name, {
+    status: 'clear', reason: '明确为普通配件、参考资料、无火照明或日常消毒用品',
+  }, { category })) });
+  assert.deepEqual(result.items.map((item) => item.name), cases.map(([name]) => name));
+  for (const item of result.items) {
+    assert.equal(item.safety.status, 'clear', item.name);
+    assert.equal(checkRules(item).banned, false, item.name);
+  }
 });

@@ -3,6 +3,7 @@ import { parseItemsText } from '../planner/index.js';
 import { makeItemMessages, PHOTO_SYSTEM_PROMPT } from './prompts.js';
 import { normalizeItems } from './normalize.js';
 import { compressPhoto } from './photo.js';
+import { restoreTextSafety } from './safety.js';
 
 const OFFLINE_WARNING = 'AI 离线，已使用本地解析';
 const SAFE_CODES = new Set(['DISABLED', 'TIMEOUT', 'HTTP_4XX', 'HTTP_5XX', 'BAD_JSON', 'EMPTY_RESULT']);
@@ -48,7 +49,8 @@ export async function aiParseItems(text, options = {}) {
       forgetChat(messages);
       return rules(input, owner, 'EMPTY_RESULT');
     }
-    return { items, source: 'ai', warnings };
+    const restored = restoreTextSafety(items, input, owner);
+    return { items: restored.items, source: 'ai', warnings: [...warnings, ...restored.warnings] };
   } catch (error) {
     if (error?.code === 'BAD_JSON' && messages) forgetChat(messages);
     return rules(input, owner, error?.code);

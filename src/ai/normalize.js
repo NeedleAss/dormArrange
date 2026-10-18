@@ -1,4 +1,5 @@
-import { LIBRARY, makeItem, parseItemsText } from '../planner/index.js';
+import { LIBRARY, checkRules, makeItem, parseItemsText } from '../planner/index.js';
+import { normalizeSafety } from './safety.js';
 
 const CATEGORIES = new Set(['luggage', 'clothes', 'bedding', 'books', 'study', 'electronics', 'appliance', 'toiletry', 'storage', 'food', 'sport', 'decor', 'trash', 'misc']);
 const FREQUENCIES = new Set(['daily', 'weekly', 'monthly', 'seasonal', 'rare']);
@@ -93,7 +94,7 @@ function bookQuantity(context, fallback) {
   const number = Number(count);
   if (/^[+-]?\d/.test(count) && (!Number.isInteger(number) || number <= 0)) return fallback;
   if (/^零+$/.test(count)) return fallback;
-  // 借用公开规则解析的中文数字处理；合成一条按摞计的书得到数量，最多产生100条临时 Item。
+  // 借用公开规则解析的中文数字处理；临时 Item 数受该解析器的数量上限约束。
   const quantity = Number.isFinite(number) ? String(number) : count;
   const amount = parseItemsText(`${quantity}摞书`).length;
   return Math.floor(bounded(amount * (unit === '本' ? 1 : 10), fallback, 1, 50));
@@ -182,7 +183,9 @@ export function normalizeItems(rawText, { owner = 'A', text = '', photo = false 
     if (!name) continue;
     const category = CATEGORIES.has(entry.category) ? entry.category : 'misc';
     const freq = FREQUENCIES.has(entry.freq) ? entry.freq : 'weekly';
-    const library = findLibrary(name, category);
+    let library = findLibrary(name, category);
+    // 原名是无危险的配件/资料时，不能因别名子串继承禁用实体的库身份。
+    if (library && !checkRules({ name }).banned && checkRules(makeItem(library.libId)).banned) library = undefined;
     const base = library ? makeItem(library.libId) : undefined;
     const context = findContext(name, library, fragments, usedFragments);
     const evidence = `${name} ${context}`;
@@ -251,6 +254,9 @@ export function normalizeItems(rawText, { owner = 'A', text = '', photo = false 
       if (base?.preferred) item.preferred = [...base.preferred];
       if (typeof base?.growthPerSemester === 'number') item.growthPerSemester = base.growthPerSemester;
       if (note) item.note = note;
+      item.safety = normalizeSafety(entry.safety, item);
+      if (item.safety.status === 'review') warnings.add('部分物品安全信息待核实，核实前暂不安排位置。');
+      if (item.safety.status === 'blocked') warnings.add('存在安全预检拦截物品，请查看原因并联系宿管。');
       items.push(item);
     }
   }

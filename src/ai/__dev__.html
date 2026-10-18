@@ -20,6 +20,7 @@
       th, td { padding: 12px; border-bottom: 1px solid #3a4353; text-align: left; }
       th { background: #202632; }
       caption { padding: 12px 0; text-align: left; }
+      th:last-child, td:last-child { min-width: 220px; max-width: 360px; white-space: normal; overflow-wrap: anywhere; }
       .hint { color: #acb6c7; }
     </style>
   </head>
@@ -46,7 +47,7 @@
       <table>
         <caption id="item-count">物品：0 件</caption>
         <thead>
-          <tr><th scope="col">名称</th><th scope="col">类别</th><th scope="col">W × D × H（cm）</th><th scope="col">sizeSource</th><th scope="col">powerW</th></tr>
+          <tr><th scope="col">名称</th><th scope="col">类别</th><th scope="col">W × D × H（cm）</th><th scope="col">sizeSource</th><th scope="col">powerW</th><th scope="col">安全预检 / 原因</th></tr>
         </thead>
         <tbody id="items-body"></tbody>
       </table>
