@@ -1,5 +1,24 @@
 import { renderBlueprint } from './blueprint.js';
 
+/** 容差上限沿物品的世界坐标展开，再与所在分区求三轴交集。 */
+function toleranceBox(placement, tolerance, zone) {
+  if (!placement || !tolerance || !zone || placement.zoneId !== zone.id) return null;
+  const anchor = placement.box;
+  const bounds = zone.box;
+  const w = placement.rot === 90 ? tolerance.maxD : tolerance.maxW;
+  const d = placement.rot === 90 ? tolerance.maxW : tolerance.maxD;
+  const h = tolerance.maxH;
+  if (!anchor || !bounds || ![anchor.x, anchor.y, anchor.z, bounds.x, bounds.y, bounds.z, bounds.w, bounds.d, bounds.h, w, d, h].every(Number.isFinite) || [bounds.w, bounds.d, bounds.h, w, d, h].some(size => size <= 0)) return null;
+  const x = Math.max(anchor.x, bounds.x);
+  const y = Math.max(anchor.y, bounds.y);
+  const z = Math.max(anchor.z, bounds.z);
+  const box = { x, y, z,
+    w: Math.min(anchor.x + w, bounds.x + bounds.w) - x,
+    d: Math.min(anchor.z + d, bounds.z + bounds.d) - z,
+    h: Math.min(anchor.y + h, bounds.y + bounds.h) - y };
+  return box.w > 0 && box.d > 0 && box.h > 0 ? box : null;
+}
+
 /** store → scene 唯一接线点；面板不调用场景的 set* 方法。 */
 export function bindScene(store, scene, fallbackElement = null) {
   function update(s, keys) {
@@ -20,17 +39,17 @@ export function bindScene(store, scene, fallbackElement = null) {
     }
     if (has('itemStates')) scene?.setItemStates?.(s.itemStates);
     if (has('camera', 'owner', 'room')) scene?.setCamera?.(s.camera, { owner: s.owner });
-    if (has('movePlan', 'stepIndex', 'episode')) {
+    if (has('movePlan', 'stepIndex', 'episode', 'sync')) {
       const plan = s.episode === 'EP02' ? s.movePlan : null;
       scene?.showFocusField?.(plan?.focusBox || null);
       scene?.setFocusFieldState?.(plan && s.stepIndex >= plan.steps.length && !plan.unresolved.length && s.sync?.parts.focus === 1 ? 'clear' : 'conflict');
     }
-    if (has('selection')) {
+    if (has('selection', 'fitReport', 'placements', 'room', 'items')) {
       const verdict = s.fitReport?.verdicts[s.selection];
       const tolerance = verdict?.tolerance;
       const zone = s.room?.zones.find(z => z.id === tolerance?.zoneId);
-      scene?.showTolerance?.(s.selection, tolerance && zone ? { ...zone.box, w: tolerance.maxW, d: tolerance.maxD, h: tolerance.maxH } : null);
-      if (s.selection) scene?.focusOn?.(s.selection);
+      scene?.showTolerance?.(s.selection, toleranceBox(s.placements[s.selection], tolerance, zone));
+      if (has('selection') && s.selection) scene?.focusOn?.(s.selection);
     }
   }
   const unsubscribe = store.subscribe(update);
