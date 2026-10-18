@@ -11,7 +11,7 @@ const INPUTS = ['pointerdown', 'pointermove', 'pointerup', 'keydown', 'keyup', '
  * @returns {{start: () => boolean, stop: () => boolean, dispose: () => void}}
  */
 export function createIdleDemo(ctx, { idleMs = 60000 } = {}) {
-  const { store, planner, scene } = ctx;
+  const { store, planner } = ctx;
   const idleDelay = Number.isFinite(idleMs) && idleMs > 0 ? idleMs : 60000;
   let disposed = false;
   let running = false;
@@ -137,6 +137,7 @@ export function createIdleDemo(ctx, { idleMs = 60000 } = {}) {
     if (!await wait(1400, token)) return false;
     const stepMs = Math.max(200, Math.min(650, 5400 / Math.max(1, plan.steps.length)));
     let animated = false;
+    const scene = ctx.scene;
     if (scene?.playSteps && plan.steps.length) {
       try {
         animation = scene.playSteps(plan.steps, { stepMs, onStep: index => write(token, { stepIndex: index }), onDone: () => {} });

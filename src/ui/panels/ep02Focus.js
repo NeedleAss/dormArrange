@@ -5,7 +5,7 @@ const startItems = new WeakMap();
 
 /** 腾桌只编排公开 API，移动中的几何交给场景；跳步交给 planner.applySteps。 */
 export function mount(el, ctx) {
-  const { store, planner, scene } = ctx;
+  const { store, planner } = ctx;
   if (!planner) { el.innerHTML = '<p class="empty">规划模块加载中</p>'; return; }
   let controller = null;
   let playbackPlan = null;
@@ -58,6 +58,7 @@ export function mount(el, ctx) {
     if (start >= plan.steps.length) { seek(0); start = 0; }
     playing = true; paused = false;
     playbackPlan = plan;
+    const scene = ctx.scene;
     if (scene?.playSteps) {
       try {
         controller = scene.playSteps(plan.steps.slice(start), {

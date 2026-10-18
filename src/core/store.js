@@ -19,7 +19,10 @@ export function createStore(initialState = {}) {
       for (const entry of [...listeners]) {
         // 话切换可能在同一轮广播中卸载旧面板，不再调用已取消的订阅。
         if (!listeners.has(entry)) continue;
-        if (!entry.keys || entry.keys.some(key => changed.includes(key))) entry.fn(state, changed);
+        if (!entry.keys || entry.keys.some(key => changed.includes(key))) {
+          try { entry.fn(state, changed); }
+          catch (error) { console.error('状态订阅处理失败，已继续通知其他模块。', error); }
+        }
       }
     },
     subscribe(fn, keys) {

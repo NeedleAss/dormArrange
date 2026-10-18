@@ -40,10 +40,11 @@ try {
     document.querySelector('#scene-placeholder').hidden = true;
   }
 } catch { document.querySelector('#scene-placeholder b').textContent = '需要支持 WebGL 的浏览器'; alert('三维视图暂不可用，仍可编辑清单与尺寸。', 'warning'); }
-bindScene(store, scene, shell.sceneFallback);
+let ctx = null;
+bindScene(store, scene, shell.sceneFallback, { onFailure: () => { scene = null; if (ctx) ctx.scene = null; } });
 const ai = await load('./ai/index.js');
 if (ai?.aiAvailable) ai.aiAvailable().then(available => store.set({ ai: { ...store.get().ai, available } })).catch(() => {});
-const ctx = { store, scene, planner, ai, alert, footer: shell.footer, showTitleCard, dismissTitleCard };
+ctx = { store, scene, planner, ai, alert, footer: shell.footer, showTitleCard, dismissTitleCard };
 const focusTimer = createFocusTimer(ctx);
 ctx.startFocus = focusTimer.start;
 let navigating = false;
