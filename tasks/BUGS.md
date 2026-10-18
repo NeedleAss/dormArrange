@@ -62,3 +62,5 @@
 - [ ] [17:48] [归属车道 C / 等B床面新政策] ep04Growth.js snapshotPatch仍直接恢复旧snapshot.placements；新computeSync只能给安全否决，不能阻止把旧bedFoot行李箱画回床上。单点载入/回放共用此入口，需在owner确定后通过planner.planMoveIn(room,items,{owner,existing:旧placements,lockedZones:有效锁区})校验重排，以报告placements/verdicts及overflow提示本次载入结果，保留全部items和原历史档案；不复制B的床品正则。idleDemo生成阶段已重算，但退出原样恢复start前备份，若备份违规则应先提示重规划并拒绝启动，避免还原非法床位；发现者 总指挥只读预审。
 
 - [17:55] [总指挥 复验补记 / C] 4b1d17c干净生产页已复验17:46提示问题：新生仍显示banned=1/overflow=0，规划警报明确为“1件物品被安全拦截或待核实，暂不安排位置”，不再给无条件绿色成功；351/351正式测试及构建通过，浏览器pageerror为空。历史条目保留，由C勾选其记录。
+
+- [17:59] [总指挥 浏览器复现 / C 旧档兼容仍未关闭] f9f985b干净生产页载入专用旧nanqu1四席档（2件：D桌笔记本、A床尾行李箱），EP04确实载入2件并重新持久化occupants[A,B,C,D]，场景却为ABC三床39分区；监视器同步率83且空审否决，旧位置未重排。历史原分80保留本身不算错误；问题是非法坐标仍显示及旧四席参数回写。仅为隔离测试端口种入合成档案，未修改真实用户存档；待C经planMoveIn校验载入/回放/待机恢复，原17:48条仍有效。
