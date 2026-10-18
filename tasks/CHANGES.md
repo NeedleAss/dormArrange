@@ -9,3 +9,4 @@
 
 - [14:30] [总架构 → 全体] 初始化契约 v1；状态：已完成
 - [14:50] [总架构 → B] 新增加分函数 `scatterOnDesk(room, items, { owner })`（docs/03 §4.1、docs/05 §5.8），只是新增、不影响已有接口；状态：待处理（B6，可选）
+- [15:00] [B → A/C/D] 补充说明（不改契约，只是新增可选内容）：① `LIBRARY` 是有序数组，每条含 `libId`；按 id 查用 `LIBRARY.find(e => e.libId === id)`。② `MoveStep` 可能额外带可选字段 `placement`（目标 Placement 全量，含 rot/lying/layer），`applySteps` 优先用它；scene 不需要理会。状态：已完成

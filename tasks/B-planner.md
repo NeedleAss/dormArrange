@@ -16,15 +16,15 @@
 
 ## B0 契约落地（目标 10 分钟内推送，A、C 车道在等）
 
-- [ ] `src/core/types.js`：把 docs/04 的全部类型写成 JSDoc `@typedef`。文件里没有运行时代码，末尾 `export {}`。
-- [ ] `src/data/roomTemplates.js`：
+- [x] `src/core/types.js`：把 docs/04 的全部类型写成 JSDoc `@typedef`。文件里没有运行时代码，末尾 `export {}`。
+- [x] `src/data/roomTemplates.js`：
   - 导出 `DEFAULT_PARAMS`
   - 实现 `buildRoom(params = DEFAULT_PARAMS)`：严格按 docs/07 §1 的公式生成 walls、openings、fixtures、zones
-- [ ] `src/data/itemLibrary.js`：
+- [x] `src/data/itemLibrary.js`：
   - 导出 `LIBRARY`（docs/07 §2 全表）
   - 实现 `makeItem(libId, overrides)`，返回符合契约的 Item
-- [ ] `src/data/rules.js`：导出 `RULES`（docs/07 §3，附来源 URL）。
-- [ ] `src/planner/index.js`：导出 docs/03 §4.1 的**全部**函数和常量。还没实现的函数先返回与 docs/04 §6 形状一致的确定性 mock：
+- [x] `src/data/rules.js`：导出 `RULES`（docs/07 §3，附来源 URL）。
+- [x] `src/planner/index.js`：导出 docs/03 §4.1 的**全部**函数和常量。还没实现的函数先返回与 docs/04 §6 形状一致的确定性 mock：
   - planMoveIn：所有物品都判为 fits，没有 placement
   - planFocusField：steps 为空数组
   - 其他函数同理
