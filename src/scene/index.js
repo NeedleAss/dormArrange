@@ -12,8 +12,61 @@ import { warningTexture } from './textures.js';
 
 const sizeText = (box) => `${Math.round(box.w)}×${Math.round(box.d)}×${Math.round(box.h)} cm`;
 
+// 所有对外调用和业务回调都在边界隔离，单项失败不会中断界面操作。
+function reportSceneError(method, error) {
+  console.error(`[Scene] ${method} 执行失败，已跳过`, error);
+}
+
+function safeCallback(callback, method) {
+  return (...args) => {
+    try { if (typeof callback === 'function') return callback(...args); }
+    catch (error) { reportSceneError(method, error); }
+  };
+}
+
+function emptyController() {
+  return { pause() {}, resume() {}, seek() {}, stop() {} };
+}
+
+function guardSceneApi(api) {
+  const guarded = {};
+  for (const [name, method] of Object.entries(api)) {
+    guarded[name] = (...args) => {
+      let finish;
+      try {
+        if (name !== 'playSteps') return method(...args);
+        const options = args[1] || {};
+        let finished = false;
+        finish = () => {
+          if (finished) return;
+          finished = true;
+          safeCallback(options.onDone, 'playSteps.onDone')();
+        };
+        const controller = method(args[0], {
+          ...options,
+          onStep: safeCallback(options.onStep, 'playSteps.onStep'),
+          onDone: finish,
+        });
+        const safeController = emptyController();
+        for (const action of Object.keys(safeController)) {
+          safeController[action] = (...controlArgs) => {
+            try { return controller?.[action]?.(...controlArgs); }
+            catch (error) { reportSceneError(`playSteps.${action}`, error); finish(); }
+          };
+        }
+        return safeController;
+      } catch (error) {
+        reportSceneError(name, error);
+        if (name === 'playSteps') { finish?.(); return emptyController(); }
+        if (name === 'snapshot') return null;
+      }
+    };
+  }
+  return guarded;
+}
+
 /** 创建唯一渲染循环，并对外提供稳定的 Scene API。 */
-export function createScene(container, { onSelect, onHover } = {}) {
+function buildScene(container, { onSelect, onHover } = {}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.bg);
   scene.fog = new THREE.Fog(COLORS.bg, 900, 3500);
@@ -254,12 +307,17 @@ export function createScene(container, { onSelect, onHover } = {}) {
 
   function focusOn(id) {
     const item = items.get(id);
-    if (item) return cameraRig.focusBox(item.box);
+    if (item) { roomView.focusDesk(null); return cameraRig.focusBox(item.box); }
     const zone = roomView.getZone(id);
+    if (zone && (zone.slot === 'desk' || /\.desk$/.test(zone.id))) {
+      roomView.focusDesk(zone);
+      return cameraRig.focusDesk(zone);
+    }
+    roomView.focusDesk(null);
     if (zone) cameraRig.focusBox(zone.box);
   }
 
-  return {
+  return guardSceneApi({
     setRoom,
     setZoneStatus: (map) => { if (!disposed) roomView.setZoneStatus(map); },
     setItems,
@@ -270,10 +328,10 @@ export function createScene(container, { onSelect, onHover } = {}) {
     playSteps: (steps, { stepMs = 900, onStep, onDone } = {}) => disposed
       ? { pause() {}, resume() {}, seek() {}, stop() {} }
       : effects.playSteps(steps, { stepMs, onStep, onDone }),
-    setCamera: (mode, { owner = 'A' } = {}) => { if (!disposed) cameraRig.setCamera(mode, { owner }); },
+    setCamera: (mode, { owner = 'A' } = {}) => { if (!disposed) { roomView.focusDesk(null); cameraRig.setCamera(mode, { owner }); } },
     focusOn,
     setBloom(on) { if (disposed) return; if (on) ensureComposer(); bloomEnabled = Boolean(on && composer); },
-    snapshot() { if (disposed) return null; try { if (bloomEnabled && composer) composer.render(); else renderer.render(scene, cameraRig.camera); return renderer.domElement.toDataURL('image/png'); } catch { return null; } },
+    snapshot() { if (disposed) return null; try { if (bloomEnabled && composer) composer.render(); else renderer.render(scene, cameraRig.camera); return renderer.domElement.toDataURL('image/png'); } catch (error) { reportSceneError('snapshot', error); return null; } },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -294,5 +352,23 @@ export function createScene(container, { onSelect, onHover } = {}) {
       container.style.position = oldPosition;
       onSelect?.(null); onHover?.(null);
     },
-  };
+  });
+}
+
+/** 即使 WebGL 初始化失败也返回完整接口，便于外壳继续交互。 */
+export function createScene(container, options = {}) {
+  try {
+    return buildScene(container, {
+      onSelect: safeCallback(options?.onSelect, 'onSelect'),
+      onHover: safeCallback(options?.onHover, 'onHover'),
+    });
+  } catch (error) {
+    reportSceneError('createScene', error);
+    return guardSceneApi({
+      setRoom() {}, setZoneStatus() {}, setItems() {}, setItemStates() {},
+      showTolerance() {}, showFocusField() {}, setFocusFieldState() {},
+      playSteps(steps, { onDone } = {}) { onDone?.(); return emptyController(); },
+      setCamera() {}, focusOn() {}, setBloom() {}, snapshot() { return null; }, dispose() {},
+    });
+  }
 }
