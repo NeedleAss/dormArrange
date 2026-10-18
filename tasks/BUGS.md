@@ -49,3 +49,6 @@
 
 - [ ] [17:16] [归属车道 A] 【人类要求优先修订】物品和固定家具全部以整块包围盒显示，台灯/水杯/耳机/椅子/梯子等不可辨认；源码定位 itemView.js 新建物品统一kit.box、roomView.js固定家具统一makeBox。按图库为现有物件增加轻量组合几何，保持碰撞Box、点选、状态、补间和释放；不新增物品、不改算法尺寸；发现者 总指挥/人类截图。
 - [ ] [17:16] [归属车道 B/C] 【人类要求优先补齐】只有默认紫荆模板，缺少图库nanqu与nanqu_new（用户称nanqu1）的参数预设和EP00切换入口；B用现有buildRoom(params)及RoomParams字段提供模板，C经planner/index接入并清理旧布局状态，A按templateId绘制对应家具形态；尺寸仍为估计，不冒充实测；发现者 总指挥/人类。
+
+- [ ] [17:26] [归属车道 A/B] 【三模板接线待修】B本地新模板以L桌外包络描述fixture，A 6f05f8b furnitureGeometry的desk仍将整个包络画成矩形，会遮住椅子区域。请按B追加的L桌约定绘制主桌面与侧翼，保持可用区避开凹口；需在B正式提交后再验收；发现者 总指挥只读审查。
+- [ ] [17:26] [归属车道 C] 【三模板演示阻断】EP02载入乱桌直接复用PRESETS.messyDesk的紫荆坐标，在B本地nanqu/nanqu1上存在载入或执行后物品越出A.desk。紫荆保留原预设数值，非默认房型使用planner.scatterOnDesk(currentRoom, clonedPresetItems, { owner })生成当地坐标，且完成后检查越界/通道；需在B正式提交后浏览器复验；发现者 总指挥只读审查。
