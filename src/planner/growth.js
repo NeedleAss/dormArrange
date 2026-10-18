@@ -43,3 +43,72 @@ export function buildGrowthSnapshots() {
     snap('snap-4', '大二上 · 腾桌后', 'Y2-F', '2026-10-18T14:10:00+08:00', items3, plan.placementsAfter, 2380)
   ];
 }
+
+const SEM_LABEL = { F: '上', S: '下' };
+const YEAR_LABEL = ['一', '二', '三', '四', '五', '六'];
+
+/** 'Y2-F' → '大二上' */
+export function semesterLabel(code) {
+  const m = /^Y(\d)-(F|S)$/.exec(code);
+  return m ? `大${YEAR_LABEL[+m[1] - 1] ?? m[1]}${SEM_LABEL[m[2]]}` : code;
+}
+
+/**
+ * 成长预测（docs/05 §9，加分）：对 growthPerSemester > 0 的物品（书）逐学期累加，
+ * 每学期用 EP01 的放置流程重放一遍，找出第一个"增长物品放不进首选分区"的学期。
+ * 复杂度 O(学期数 × planMoveIn)，8 学期约 50ms。
+ * @param {import('../core/types.js').Item[]} items
+ * @param {import('../core/types.js').Room} room
+ * @param {{ owner?: string, semesters?: number }} [opts]
+ * @returns {import('../core/types.js').GrowthForecast}
+ */
+export function predictGrowth(items, room, opts = {}) {
+  const owner = opts.owner ?? 'A';
+  const n = Math.max(1, opts.semesters ?? 8);
+  const semesters = [];
+  for (let k = 0; k < n; k++) semesters.push(`Y${Math.floor(k / 2) + 1}-${k % 2 ? 'S' : 'F'}`);
+  const growers = items.filter((it) => (it.growthPerSemester ?? 0) > 0).sort((a, b) => (a.id < b.id ? -1 : 1));
+  // 增长速度按物品种类（libId）计：库里"书"是每学期 +0.5 摞，与现在有几摞无关
+  const perKind = new Map();
+  for (const it of growers) {
+    const key = it.libId ?? it.id;
+    perKind.set(key, Math.max(perKind.get(key) ?? 0, it.growthPerSemester));
+  }
+  const rate = [...perKind.values()].reduce((s, v) => s + v, 0);
+  const watchSlot = growers[0]?.preferred?.[0] ?? 'hutch';
+  const watchZoneId = `${owner}.${watchSlot}`;
+  const fill = {};
+  let firstOverflow = null;
+  for (let k = 0; k < n; k++) {
+    // 第 k 学期新增的件数（向下取整：半摞书不算一摞）
+    const extraN = growers.length ? Math.floor(rate * k + 1e-9) : 0;
+    const extras = [];
+    for (let e = 0; e < extraN; e++) {
+      const src = growers[e % growers.length];
+      extras.push({ ...structuredClone(src), id: `${src.id}~g${String(e + 1).padStart(2, '0')}`, name: `${src.name}（新增）` });
+    }
+    const all = [...items, ...extras];
+    const rep = planMoveIn(room, all, { owner });
+    const zf = rep.zoneFill;
+    const zones = new Set([watchZoneId, `${owner}.desk`]);
+    for (const it of [...growers, ...extras]) if (rep.placements[it.id]) zones.add(rep.placements[it.id].zoneId);
+    for (const id of zones) {
+      if (!fill[id]) fill[id] = new Array(k).fill(0);
+    }
+    for (const id of Object.keys(fill)) fill[id].push(zf[id] ?? 0);
+    if (!firstOverflow) {
+      const spilled = [...growers, ...extras].some((it) => {
+        const p = rep.placements[it.id];
+        return !p || p.zoneId !== watchZoneId;
+      });
+      if (spilled && k > 0) firstOverflow = { zoneId: watchZoneId, semester: semesters[k] };
+    }
+  }
+  const perSem = Math.round(rate * 10);
+  const what = growers[0]?.category === 'books' ? `${perSem} 本书` : `${Math.round(rate * 10) / 10} 件`;
+  const text = !growers.length ? '没有会随学期增长的物品'
+    : firstOverflow
+      ? `按每学期 +${what}的速度，${semesterLabel(firstOverflow.semester)}书架会满。建议届时把旧教材收进床尾箱`
+      : `按每学期 +${what}的速度，${n} 个学期内书架都放得下`;
+  return { semesters, fill, firstOverflow, text };
+}

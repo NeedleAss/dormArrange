@@ -1,11 +1,11 @@
 // 规划引擎公开 API（docs/03 §4.1）。跨模块只能 import 本文件。
-// 尚未实现的加分函数返回与 docs/04 §6 形状一致的确定性 mock。
 
 export { DEFAULT_PARAMS, buildRoom } from '../data/roomTemplates.js';
 export { LIBRARY, makeItem } from '../data/itemLibrary.js';
 export { RULES } from '../data/rules.js';
 import { PRESETS as DATA_PRESETS } from '../data/demoPresets.js';
 import { buildGrowthSnapshots } from './growth.js';
+export { predictGrowth } from './growth.js';
 export { checkRules } from './checkRules.js';
 export { parseItemsText } from './parseText.js';
 export { zoneFill } from './engines.js';
@@ -20,9 +20,4 @@ export { scatterOnDesk } from './scatter.js';
  * （data/ 不能反向 import planner/），所以在这里合并。导入时确定性地算一次。
  */
 export const PRESETS = Object.freeze({ ...DATA_PRESETS, growth: buildGrowthSnapshots() });
-
-/** 加分：成长预测（mock） */
-export function predictGrowth(items, room, opts = {}) {
-  return { semesters: [], fill: {}, firstOverflow: null, text: '' };
-}
 

@@ -111,5 +111,5 @@
 ## B6 加分
 
 - [ ] `allowUpgrades: true`：生成"增高架 / 桌面置物架 / 侧边挂钩"三种虚拟分区，输出 alternatives，例如"多花 ¥39，少挪 2 步"（docs/05 §5.7）。
-- [ ] `predictGrowth(items, room, semesters)`：书架溢出预测（docs/05 §9）。
+- [x] `predictGrowth(items, room, semesters)`：书架溢出预测（docs/05 §9）。
 - [x] `scatterOnDesk(room, items, { owner })`：乱桌生成器（docs/05 §5.8），用于观众互动"说出你桌上的东西 → 现场腾桌"。

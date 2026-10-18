@@ -163,3 +163,20 @@ test('scatterOnDesk：东西堆在桌面前沿，作为 planFocusField 输入能
   assertValidPlacements(room, fp.placementsAfter);
   assert.ok(fp.metrics.syncAfter >= fp.metrics.syncBefore);
 });
+
+test('predictGrowth：每学期 +5 本书，书架在某学期满；形状符合 GrowthForecast；结果确定', async () => {
+  const { predictGrowth } = await import('../src/planner/index.js');
+  const g = predictGrowth(items, room);
+  assert.deepEqual(g.semesters, ['Y1-F', 'Y1-S', 'Y2-F', 'Y2-S', 'Y3-F', 'Y3-S', 'Y4-F', 'Y4-S']);
+  for (const arr of Object.values(g.fill)) {
+    assert.equal(arr.length, 8);
+    assert.ok(arr.every((v) => v >= 0 && v <= 1));
+  }
+  assert.ok(g.fill['A.hutch'][7] >= g.fill['A.hutch'][0]);
+  assert.ok(g.firstOverflow && g.semesters.includes(g.firstOverflow.semester));
+  assert.match(g.text, /\+5 本书/);
+  assert.equal(JSON.stringify(predictGrowth(items, room)), JSON.stringify(g));
+  const none = predictGrowth([makeItem('lamp', { id: 'l' })], room, { semesters: 2 });
+  assert.equal(none.firstOverflow, null);
+  assert.equal(none.semesters.length, 2);
+});
