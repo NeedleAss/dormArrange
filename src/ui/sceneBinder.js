@@ -2,13 +2,13 @@
 export function bindScene(store, scene) {
   function update(s, keys) {
     const has = (...names) => names.some(name => keys.includes(name));
+    if (has('room') && s.room) scene?.setRoom?.(s.room);
     if (has('room', 'placements', 'lockedZones')) {
       const occupied = new Set(Object.values(s.placements).map(p => p.zoneId));
       const zoneStatus = Object.fromEntries((s.room?.zones || []).map(z => [z.id,
         s.lockedZones.includes(z.id) ? 'done' : occupied.has(z.id) ? 'designing' : 'empty']));
       store.set({ zoneStatus });
     }
-    if (has('room') && s.room) scene?.setRoom?.(s.room);
     if (has('zoneStatus')) scene?.setZoneStatus?.(s.zoneStatus);
     if (has('items', 'placements', 'fitReport')) scene?.setItems?.(s.items, s.placements, { animate: true, overflowIds: s.fitReport?.overflowIds || [] });
     if (has('itemStates')) scene?.setItemStates?.(s.itemStates);

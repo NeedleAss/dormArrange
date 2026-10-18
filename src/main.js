@@ -10,6 +10,8 @@ import { bindScene } from './ui/sceneBinder.js';
 import { EPISODES } from './ui/helpers.js';
 import { boot } from './ui/boot.js';
 import { showTitleCard } from './ui/titleCard.js';
+import * as modelPanel from './ui/panels/ep00Model.js';
+import * as moveInPanel from './ui/panels/ep01MoveIn.js';
 
 // glob 只收集已存在的公开入口，缺席车道不会触发浏览器 404 或构建失败。
 const loaders = import.meta.glob(['./planner/index.js', './scene/index.js', './ai/index.js']);
@@ -41,9 +43,15 @@ async function navigate(id) {
   store.set({ episode: id });
   navigating = false;
 }
+let activePanel = null;
+const panels = { EP00: modelPanel, EP01: moveInPanel };
 function render() {
+  activePanel?.unmount();
   const ep = EPISODES.find(e => e.id === store.get().episode);
-  shell.panel.innerHTML = panelHeading(ep) + '<div class="panel"><div class="panel-head">SYSTEM READY <b>任务准备</b></div><div class="panel-body"><p>空间蓝图已载入。</p><p class="hint">正在接入本话操作面板。</p></div></div>';
+  shell.panel.innerHTML = panelHeading(ep) + '<div id="episode-panel"></div>';
+  shell.footer.innerHTML = '<span class="muted">从丈量一间宿舍开始。</span>';
+  activePanel = panels[ep.id];
+  activePanel?.mount(shell.panel.querySelector('#episode-panel'), ctx);
 }
 document.querySelectorAll('[data-episode]').forEach(b => b.onclick = () => navigate(b.dataset.episode));
 document.addEventListener('keydown', event => {

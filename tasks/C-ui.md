@@ -44,23 +44,23 @@
 
 ## C2 EP00 建模 + EP01 入住面板（25 分钟）
 
-- [ ] **EP00**：
+- [x] **EP00**：
   - 模板参数表单：房间长宽高、门、阳台、单元尺寸等，字段见 docs/07 §1
   - 「数地砖」换算小工具：块数 × 砖长 = 尺寸
   - 每个尺寸后面标注来源（估计 / 实测）
   - 改动参数后立刻执行 `buildRoom(params)` → `scene.setRoom`
-- [ ] **EP00 分区列表**：
+- [x] **EP00 分区列表**：
   - 显示每个分区的名称、状态（空白 / 设计中 / 已完成）和占用率
   - 可以锁定或解锁分区
   - 点击分区 → `scene.focusOn(zoneId)`
-- [ ] **EP01 输入区**：
+- [x] **EP01 输入区**：
   - 大文本框 + 「载入新生示例」按钮（`PRESETS.freshman`）
   - 物品库下拉，用来逐个添加
   - 每个物品可以编辑尺寸和来源
-- [ ] 「开始规划」按钮：
+- [x] 「开始规划」按钮：
   - 先调用 `ai.aiParseItems(text)`，它自带兜底；D 车道还没完成时，直接用 `parseItemsText`
   - 然后依次调用 `planMoveIn(room, items, { owner, lockedZones })` → `scene.setItems` → `scene.setItemStates`
-- [ ] **结果区**：
+- [x] **结果区**：
   - 按五类分组，每组带数量徽章：能放下 / 需换位置 / 尺寸待定 / 放不下 / 禁止携带
   - 点击一条结果：执行 `scene.focusOn`，并展示原因、建议和容差句子
   - 如果是 uncertain，同时调用 `scene.showTolerance`
