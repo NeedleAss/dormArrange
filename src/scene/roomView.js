@@ -20,6 +20,7 @@ export function createRoomView(kit) {
   const zoneData = new Map();
   const zoneViews = new Map();
   const fixedTargets = [];
+  const fixtureViews = [];
 
   /** @param {object} box */
   function validBox(box) {
@@ -67,6 +68,7 @@ export function createRoomView(kit) {
     for (const child of [...group.children]) kit.disposeObject(child);
     group.clear();
     fixedTargets.length = 0;
+    fixtureViews.length = 0;
     zoneViews.clear();
     zoneData.clear();
   }
@@ -96,6 +98,7 @@ export function createRoomView(kit) {
         lineOpacity: 0.8,
       });
       view.name = fixture.id;
+      fixtureViews.push({ fixture, view, opacity: container ? 0.06 : 0.9 });
       const target = setPick(view, 'fixture', fixture);
       if (target) fixedTargets.push(target);
     }
@@ -161,12 +164,26 @@ export function createRoomView(kit) {
     return fixedTargets.concat([...zoneViews.values()].map((entry) => entry.target).filter(Boolean));
   }
 
+  /** 聚焦桌面时减弱上方遮挡，切回其他视角恢复，不改变真实几何。 */
+  function focusDesk(zone = null) {
+    for (const { fixture, view, opacity } of fixtureViews) {
+      const a = fixture.box;
+      const b = zone?.box;
+      const overhead = b && a.x < b.x + b.w && a.x + a.w > b.x
+        && a.z < b.z + b.d && a.z + a.d > b.z && a.y + a.h > b.y
+        && (a.y >= b.y || /bed|loft|rail|hutch|shelf/i.test(fixture.type));
+      view.userData.fill.material.opacity = overhead ? 0.015 : opacity;
+      view.userData.edge.material.opacity = overhead ? 0.12 : 0.8;
+    }
+  }
+
   return {
     group,
     setRoom,
     setZoneStatus,
     update,
     getTargets,
+    focusDesk,
     getZone: (id) => zoneData.get(id),
     dispose: clear,
   };

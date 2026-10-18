@@ -188,6 +188,21 @@ export function createCameraRig({ container, domElement, onCameraChange }) {
     if (destination) goTo(nextMode, destination);
   }
 
+  /** 书桌采用前沿斜俯视，避免继承座位视角的低仰角遮住冲突物品。 */
+  function focusDesk(zone) {
+    if (disposed || !validBox(zone?.box)) return;
+    const box = { ...zone.box, h: Math.max(1, Math.min(zone.box.h, 45)) };
+    const front = { '+x': [1, 0, 0], '-x': [-1, 0, 0], '+z': [0, 0, 1], '-z': [0, 0, -1] }[zone.front];
+    if (!front) return focusBox(box);
+    const direction = new Vector3(...front);
+    direction.y = 1;
+    direction.normalize();
+    const target = centerOf(box);
+    const distance = fitDistance(box, direction, WORLD_UP, 50, aspect, 0.4);
+    goTo('orbit', { target, position: target.clone().addScaledVector(direction, distance),
+      up: WORLD_UP.clone(), fov: 50, halfHeight });
+  }
+
   /** @param {Box} box */
   function focusBox(box) {
     if (disposed || !validBox(box)) return;
@@ -256,5 +271,5 @@ export function createCameraRig({ container, domElement, onCameraChange }) {
   }
 
   return { get camera() { return camera; }, get controls() { return controls; },
-    setRoom, setCamera, focusBox, resize, update, dispose };
+    setRoom, setCamera, focusBox, focusDesk, resize, update, dispose };
 }
