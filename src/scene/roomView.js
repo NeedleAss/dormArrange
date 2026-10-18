@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createFurnitureView } from './furnitureGeometry.js';
 
 const PALETTE = Object.freeze({
   amber: '#ff9a1f',
@@ -36,7 +37,7 @@ export function createRoomView(kit) {
   }
 
   function setPick(view, kind, datum) {
-    const mesh = view.userData.fill;
+    const mesh = view.userData.pickProxy || view.userData.fill;
     const pick = { kind, id: datum.id, label: datum.label || datum.type || datum.id, box: { ...datum.box } };
     view.userData.pick = pick;
     if (mesh) mesh.userData.pick = pick;
@@ -90,15 +91,10 @@ export function createRoomView(kit) {
     }
     for (const fixture of room.fixtures || []) {
       if (!validBox(fixture.box)) continue;
-      const container = fixture.type === 'wardrobe' || fixture.type === 'hutch';
-      const view = makeBox(fixture.box, {
-        fill: PALETTE.furniture,
-        fillOpacity: container ? 0.06 : 0.9,
-        line: PALETTE.amber,
-        lineOpacity: 0.8,
-      });
+      const view = createFurnitureView(fixture, room);
+      group.add(view);
       view.name = fixture.id;
-      fixtureViews.push({ fixture, view, opacity: container ? 0.06 : 0.9 });
+      fixtureViews.push({ fixture, view });
       const target = setPick(view, 'fixture', fixture);
       if (target) fixedTargets.push(target);
     }
@@ -166,13 +162,13 @@ export function createRoomView(kit) {
 
   /** 聚焦桌面时减弱上方遮挡，切回其他视角恢复，不改变真实几何。 */
   function focusDesk(zone = null) {
-    for (const { fixture, view, opacity } of fixtureViews) {
+    for (const { fixture, view } of fixtureViews) {
       const a = fixture.box;
       const b = zone?.box;
       const overhead = b && a.x < b.x + b.w && a.x + a.w > b.x
         && a.z < b.z + b.d && a.z + a.d > b.z && a.y + a.h > b.y
         && (a.y >= b.y || /bed|loft|rail|hutch|shelf/i.test(fixture.type));
-      view.userData.fill.material.opacity = overhead ? 0.015 : opacity;
+      for (const { mesh, opacity } of view.userData.fills) mesh.material.opacity = overhead ? 0.015 : opacity;
       view.userData.edge.material.opacity = overhead ? 0.12 : 0.8;
     }
   }
