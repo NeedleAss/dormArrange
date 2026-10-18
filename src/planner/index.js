@@ -6,6 +6,8 @@ export { LIBRARY, makeItem } from '../data/itemLibrary.js';
 export { RULES } from '../data/rules.js';
 export { PRESETS } from '../data/demoPresets.js';
 export { checkRules } from './checkRules.js';
+export { parseItemsText } from './parseText.js';
+export { zoneFill } from './engines.js';
 
 const DEFAULT_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -83,16 +85,6 @@ export function diffMonths(monthPlanA, monthPlanB, items, room) {
 /** 同步率与三审决议（mock） */
 export function computeSync(room, items, placements, ctx = {}) {
   return mockSync();
-}
-
-/** 各分区占用率（mock：空） */
-export function zoneFill(room, items, placements) {
-  return {};
-}
-
-/** 规则文本解析（mock：空数组） */
-export function parseItemsText(text, opts = {}) {
-  return [];
 }
 
 /** 加分：成长预测（mock） */

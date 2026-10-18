@@ -98,13 +98,13 @@
 
 ## B5 文本解析 + 演示预设（15 分钟）
 
-- [ ] `parseItemsText`：实现 docs/05 §8，支持中文数字、数量词、"寸"、"长×宽×高"、功率（W/瓦）；匹配不到物品库的物品，sizeSource 设为 `'unknown'`。
+- [x] `parseItemsText`：实现 docs/05 §8，支持中文数字、数量词、"寸"、"长×宽×高"、功率（W/瓦）；匹配不到物品库的物品，sizeSource 设为 `'unknown'`。
 - [ ] `src/data/demoPresets.js` 导出 `PRESETS`（具体见 docs/07 §4）：
-  - `freshman`：新生清单的文本
+  - [x] `freshman`：新生清单的文本
   - `messyDesk`：老生乱桌，包含 items 和 placements，用 `buildRoom()` 的 A.desk 等分区
   - `growth`：4 个快照
 - [ ] 队友收集到真实清单后，替换掉示例数据，但要保持各测试的断言仍然成立。
-- [ ] `tests/parse.test.js`：输入 `"24寸行李箱，两床被子，27寸显示器，书20本，1500W电热水壶"`，断言：
+- [x] `tests/parse.test.js`：输入 `"24寸行李箱，两床被子，27寸显示器，书20本，1500W电热水壶"`，断言：
   - 解析出 7 个物品：1 箱 + 2 被 + 1 显示器 + 2 摞书 + 1 水壶
   - 水壶的 `powerW === 1500`
 
