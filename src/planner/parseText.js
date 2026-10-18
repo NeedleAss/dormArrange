@@ -83,7 +83,8 @@ function normalize(text) {
     else s += ch;
   }
   s = s.replace(/×/g, 'x');
-  return s.replace(/十几|[零一二两三四五六七八九十百]+/g, (m) => String(cnToNum(m)));
+  // 单独出现的"零"不是数字（零食、零钱），只有和其他中文数字相连时才转换（一百零五）
+  return s.replace(/十几|[零一二两三四五六七八九十百]+/g, (m) => (/^零+$/.test(m) ? m : String(cnToNum(m))));
 }
 
 /** 在物品库的 name 和 aliases 中找"出现在 frag 里的最长别名"；同长时按 LIBRARY 顺序 */

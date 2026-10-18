@@ -75,3 +75,14 @@ test('PRESETS.freshman 解析结果稳定且数量正确', () => {
   assert.ok(a.some((it) => it.libId === 'guitar'));
   assert.ok(a.some((it) => it.libId === 'box-l' && it.sizeSource === 'unknown'));
 });
+
+test('"零"单独出现时不是数字：零食、零食箱；与其他数字相连时照常转换', () => {
+  const [a] = parseItemsText('零食箱');
+  assert.equal(a.libId, 'snack-box');
+  assert.equal(a.name, '零食箱');
+  const [b] = parseItemsText('零食');
+  assert.equal(b.libId, 'snack-box');
+  assert.equal(parseItemsText('三盒零食').length, 3);
+  assert.equal(parseItemsText('书一百零五本').filter((it) => it.category === 'books').length, 11);
+  assert.equal(parseItemsText('十几本书').filter((it) => it.category === 'books').length, 2);
+});

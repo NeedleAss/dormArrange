@@ -122,7 +122,7 @@ test('演示 3 · 观众互动：随手清单 → scatterOnDesk → planFocusFie
   assert.equal(JSON.stringify(planFocusField(room, items, pls)), JSON.stringify(plan));
 });
 
-test('演示 3 · 观众口语：「零食箱」应匹配物品库零食箱', { todo: '已知问题 B：中文数字规范化把"零"转成 0，见 BUGS.md' }, () => {
+test('演示 3 · 观众口语：「零食箱」应匹配物品库零食箱', () => {
   const items = parseItemsText('零食箱', { idPrefix: 'aud' });
   assert.equal(items.length, 1);
   assert.equal(items[0].libId, 'snack-box');
