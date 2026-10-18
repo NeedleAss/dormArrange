@@ -119,6 +119,7 @@ function buildScene(container, { onSelect, onHover } = {}) {
   let disposed = false;
   let frame = 0;
   let selectedId = null;
+  let toleranceId = null;
   let hoveredId = null;
   let selectedLabel = null;
   let hoverLabel = null;
@@ -285,6 +286,12 @@ function buildScene(container, { onSelect, onHover } = {}) {
     if (disposed) return;
     const hadRoom = Boolean(room);
     room = nextRoom || null;
+    if (toleranceId !== null) effects.showTolerance(toleranceId, null);
+    toleranceId = null;
+    selectedId = null;
+    items.select(null);
+    if (selectedLabel) kit.disposeObject(selectedLabel);
+    selectedLabel = null;
     clearHover();
     roomView.setRoom(room);
     cameraRig.setRoom(room, { immediate: !hadRoom });
@@ -322,7 +329,13 @@ function buildScene(container, { onSelect, onHover } = {}) {
     setZoneStatus: (map) => { if (!disposed) roomView.setZoneStatus(map); },
     setItems,
     setItemStates: (map) => { if (!disposed) items.setItemStates(map); },
-    showTolerance: (itemId, box) => { if (!disposed) effects.showTolerance(itemId, box); },
+    showTolerance: (itemId, box) => {
+      if (disposed) return;
+      // 容差跟随当前选择；取消选择或换房时清除上一个物品的幽灵盒。
+      if (toleranceId !== null && toleranceId !== itemId) effects.showTolerance(toleranceId, null);
+      effects.showTolerance(itemId, box);
+      toleranceId = validBox(box) ? itemId : null;
+    },
     showFocusField: (box) => { if (!disposed) effects.showFocusField(box); },
     setFocusFieldState: (state) => { if (!disposed) effects.setFocusFieldState(state); },
     playSteps: (steps, { stepMs = 900, onStep, onDone } = {}) => disposed
