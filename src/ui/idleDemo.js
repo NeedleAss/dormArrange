@@ -1,4 +1,5 @@
 import '../styles/idleDemo.css';
+import { migrateLayout } from './layoutMigration.js';
 
 const PERSISTED = new Set(['roomParams', 'snapshots', 'focusMinutes']);
 const MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
@@ -17,6 +18,7 @@ export function createIdleDemo(ctx, { idleMs = 60000 } = {}) {
   let running = false;
   let serial = 0;
   let saved = null;
+  let savedRoomParams = null;
   let idleTimer = null;
   let animation = null;
   let lastInput = Date.now();
@@ -45,7 +47,7 @@ export function createIdleDemo(ctx, { idleMs = 60000 } = {}) {
     return !state.timer?.running && !state.ai?.busy && !document.hidden
       && !document.querySelector('.title-card,.boot-screen,.focus-limit')
       && !!state.room && typeof ctx.navigate === 'function' && typeof ctx.refreshPanel === 'function'
-      && ['parseItemsText', 'planMoveIn', 'planFocusField', 'planSeasons', 'computeSync', 'scatterOnDesk', 'diffMonths', 'applySteps'].every(key => typeof planner?.[key] === 'function');
+      && ['buildRoom', 'parseItemsText', 'planMoveIn', 'planFocusField', 'planSeasons', 'computeSync', 'scatterOnDesk', 'diffMonths', 'applySteps'].every(key => typeof planner?.[key] === 'function');
   }
 
   function arm(delay = Math.max(1, idleDelay - (Date.now() - lastInput))) {
@@ -112,7 +114,7 @@ export function createIdleDemo(ctx, { idleMs = 60000 } = {}) {
     const firstIds = new Set(firstItems.map(item => item.id));
     const extra = secondItems.filter(item => !firstIds.has(item.id));
     const second = { ...first, ...planner.scatterOnDesk(room, extra, { owner, existing: first, existingItems: firstItems }) };
-    const rooms = store.get().roomParams || room.params;
+    const rooms = room.params;
     // 成长预览没有 movePlan；移除本次真实 dispose 的物品，避免快递盒在滞留区重新出现。
     const disposedIds = new Set(focus.steps.filter(step => step.kind === 'dispose').map(step => step.itemId));
     const clearedItems = messyItems.filter(item => !disposedIds.has(item.id));
@@ -165,7 +167,7 @@ export function createIdleDemo(ctx, { idleMs = 60000 } = {}) {
     if (!await wait(0, token)) return;
     const data = buildData(room, owner, originalFocusMinutes);
     while (valid(token)) {
-      write(token, { items: [], placements: {}, itemStates: {}, owner, lockedZones: [], fitReport: null, movePlan: null, stepIndex: 0,
+      write(token, { room, items: [], placements: {}, itemStates: {}, owner, lockedZones: [], fitReport: null, movePlan: null, stepIndex: 0,
         tdmPlan: null, sync: null, selection: null, camera: 'orbit', focusSpec: data.spec });
       if (!await go('EP00', '第零话 / 以当前宿舍展示空间结构', token)) return;
       if (!await wait(3000, token)) return;
@@ -227,14 +229,16 @@ export function createIdleDemo(ctx, { idleMs = 60000 } = {}) {
   function start() {
     if (disposed || running || !available()) return false;
     const state = store.get();
-    const owner = state.room.zones.some(zone => zone.id === `${state.owner}.desk`) ? state.owner
-      : state.room.zones.find(zone => zone.slot === 'desk' && zone.owner !== 'pub')?.owner;
-    if (!owner) return false;
+    let room;
+    let owner;
     try {
       const snapshot = structuredClone(state);
+      // 演示只借用当前模板；三床房型不能从缓存 Room 复活旧 D 床位。
+      savedRoomParams = structuredClone(snapshot.roomParams || snapshot.room.params);
+      room = planner.buildRoom(savedRoomParams);
+      owner = room.params.occupants.includes(state.owner) ? state.owner : room.params.occupants[0];
+      if (!owner) return false;
       saved = Object.fromEntries(Object.entries(snapshot).filter(([key]) => !PERSISTED.has(key)));
-      // 腾桌面板以只读 MovePlan 的对象身份保存回放基准；演示替换该字段，不修改原计划。
-      if (Object.hasOwn(state, 'movePlan')) saved.movePlan = state.movePlan;
     } catch { return false; }
     clearTimeout(idleTimer);
     running = true;
@@ -242,7 +246,7 @@ export function createIdleDemo(ctx, { idleMs = 60000 } = {}) {
     const token = ++serial;
     launcher.hidden = true;
     banner.hidden = false;
-    run(token, state.room, owner, state.focusMinutes).catch(() => {
+    run(token, room, owner, state.focusMinutes).catch(() => {
       if (!valid(token)) return;
       stop();
       ctx.alert?.('待机演示暂时无法继续，已回到你的布局。', 'warning');
@@ -263,9 +267,26 @@ export function createIdleDemo(ctx, { idleMs = 60000 } = {}) {
     delete ctx.previewSnapshots;
     delete ctx.previewSnapshotId;
     const original = saved;
+    const roomParams = savedRoomParams;
     saved = null;
-    if (original) store.set(original);
+    savedRoomParams = null;
+    let notices = [];
+    if (original) {
+      try {
+        // 恢复时重建并复核全量物品，旧腾桌步骤和全年缓存绝不回灌。
+        const migrated = migrateLayout(planner, { ...original, roomParams });
+        notices = migrated.notices;
+        const restored = { ...original, ...migrated.patch };
+        store.set(Object.fromEntries(Object.entries(restored).filter(([key]) => !PERSISTED.has(key))));
+      } catch {
+        // 无法证明位置合法时仍保留全部物品记录，等待用户校准，不展示旧床尾落点。
+        store.set({ ...original, room: null, placements: {}, itemStates: Object.fromEntries(original.items.map(item => [item.id, 'overflow'])),
+          movePlan: null, stepIndex: 0, tdmPlan: null, fitReport: null, sync: null, selection: null });
+        notices = ['原布局未能复核，物品记录已保留，请先在建模页核对宿舍。'];
+      }
+    }
     ctx.refreshPanel();
+    notices.forEach(notice => ctx.alert?.(notice, 'warning'));
     banner.hidden = true;
     launcher.hidden = false;
     lastInput = Date.now();

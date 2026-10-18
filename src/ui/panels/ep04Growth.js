@@ -1,6 +1,7 @@
 import { esc, clone } from '../helpers.js';
 import { sparkline } from '../widgets/monitor.js';
 import { createSnapshotThumb, isSnapshotThumb } from '../snapshotThumb.js';
+import { migrateLayout } from '../layoutMigration.js';
 import '../../styles/growth.css';
 
 let cleanup = () => {};
@@ -15,7 +16,7 @@ export function mount(el, ctx) {
   cleanup();
   cleanup = () => {};
   const { store, planner, footer } = ctx;
-  if (!planner?.buildRoom || !planner?.computeSync) {
+  if (!planner?.buildRoom || !planner?.planMoveIn || !planner?.computeSync) {
     el.innerHTML = '<p class="empty">成长模块加载中</p>';
     return;
   }
@@ -26,6 +27,7 @@ export function mount(el, ctx) {
   let playbackTimer = null;
   let replayIds = [];
   let replayIndex = 0;
+  let migrationNotices = [];
   const presets = Array.isArray(planner.PRESETS?.growth) ? planner.PRESETS.growth : [];
   const presetIds = new Set(presets.map(snapshot => snapshot.id));
   // 待机演示使用内存预览集合，不覆盖用户已保存的快照或累计时长。
@@ -37,6 +39,7 @@ export function mount(el, ctx) {
     <p class="hint">点历史节点载入当时的布局与时长。</p>
     <div class="button-row"><button class="btn compact" type="button" data-growth-preset>载入成长示例</button><button class="btn compact" type="button" data-growth-replay>回放</button></div>
     <div class="growth-current" aria-live="polite"><strong>当前布局</strong></div>
+    <details class="growth-migration" hidden><summary>布局复核</summary><ul></ul></details>
     <div class="section-title">同步率变化</div><div class="growth-chart"></div><div class="growth-chart-caption"><span>0—100%</span><span class="growth-record-count">0 个快照</span></div>
     <div class="section-title">历史快照</div><div class="growth-records"></div>
     <div class="section-title">成长预测</div><button class="btn full" type="button" data-growth-forecast>查看未来收纳需求</button><p class="hint growth-forecast"></p>`;
@@ -50,6 +53,7 @@ export function mount(el, ctx) {
   const forecastButton = el.querySelector('[data-growth-forecast]');
   const forecast = el.querySelector('.growth-forecast');
   const current = el.querySelector('.growth-current');
+  const migration = el.querySelector('.growth-migration');
   const records = el.querySelector('.growth-records');
   const timeline = footer.querySelector('.growth-timeline');
   const minutes = el.querySelector('.growth-minutes');
@@ -70,34 +74,32 @@ export function mount(el, ctx) {
 
   function snapshotPatch(snapshot) {
     const state = store.get();
-    const roomParams = clone(snapshot.roomParams);
-    const room = planner.buildRoom(roomParams);
-    const items = clone(snapshot.items);
-    const placements = clone(snapshot.placements);
     // 快照契约没有 owner；唯一的非公共物品归属可还原使用者，多归属或空快照沿用当前使用者。
-    const owners = new Set(items.map(item => item.owner).filter(owner => ['A', 'B', 'C', 'D'].includes(owner)));
-    const owner = presetIds.has(snapshot.id) ? 'A' : owners.size === 1 ? [...owners][0] : state.owner;
-    const sync = planner.computeSync(room, items, placements, { owner });
+    const owners = new Set(snapshot.items.map(item => item.owner).filter(owner => ['A', 'B', 'C', 'D'].includes(owner)));
+    const owner = snapshot.owner ?? (presetIds.has(snapshot.id) ? 'A' : owners.size === 1 ? [...owners][0] : state.owner);
+    // 原记录仍用于历史曲线；每次载入和回放都按当前模板重算，绝不沿用旧床尾坐标或缓存计划。
+    const { patch, notices } = migrateLayout(planner, { ...snapshot, focusSpec: snapshot.focusSpec || state.focusSpec }, {
+      owner, lockedZones: state.lockedZones
+    });
+    const sync = patch.sync || planner.computeSync(patch.room, patch.items, patch.placements, { owner: patch.owner });
     if (!Number.isFinite(sync?.total) || !Number.isFinite(snapshot.focusMinutes)) throw new Error('invalid snapshot');
-    return {
-      roomParams, room, items, placements, owner, sync,
+    return { notices, patch: {
+      ...patch, sync,
       focusMinutes: snapshot.focusMinutes,
-      syncHistory: [...state.syncHistory, { t: new Date().toISOString(), total: sync.total, label: snapshot.label }].slice(-60),
-      itemStates: Object.fromEntries(items.map(item => [item.id, placements[item.id] ? 'fits' : 'overflow'])),
-      focusSpec: { ...state.focusSpec, zoneId: `${owner}.desk` },
-      lockedZones: state.lockedZones.filter(id => room.zones.some(zone => zone.id === id)),
-      fitReport: null, movePlan: null, stepIndex: 0, tdmPlan: null, selection: null
-    };
+      syncHistory: [...state.syncHistory, { t: new Date().toISOString(), total: sync.total, label: `${snapshot.label} · 复核` }].slice(-60)
+    } };
   }
 
   function loadSnapshot(id, notify = false) {
     const snapshot = snapshotsOf().find(entry => entry.id === id);
     if (!snapshot) return false;
     try {
-      const patch = snapshotPatch(snapshot);
+      const { patch, notices } = snapshotPatch(snapshot);
       selectedId = id;
+      migrationNotices = notices;
       store.set(patch);
-      if (notify) ctx.alert(`已载入「${snapshot.label}」。`);
+      if (notices.length) ctx.alert(`已复核「${snapshot.label}」，${notices.length} 项说明请展开「布局复核」查看。`, 'warning');
+      else if (notify) ctx.alert(`已载入并复核「${snapshot.label}」。`);
       return true;
     } catch {
       ctx.alert('这份快照暂时无法载入，当前布局已保留。', 'warning');
@@ -111,14 +113,23 @@ export function mount(el, ctx) {
     if (!form.reportValidity()) return;
     const label = nameInput.value.trim();
     if (!label) { nameInput.focus(); return; }
-    const state = store.get();
+    let state = store.get();
     if (!state.room || !state.roomParams) { ctx.alert('先完成宿舍建模，再保存快照。', 'warning'); return; }
     saving = true;
     form.setAttribute('aria-busy', 'true');
     renderStats(state);
     stopPlayback(false);
     try {
-      const sync = planner.computeSync(state.room, state.items, state.placements, { owner: state.owner });
+      // 保存前同样校验完整当前布局，避免旧状态被原样另存为新快照。
+      const { patch, notices } = migrateLayout(planner, state);
+      migrationNotices = notices;
+      store.set(patch);
+      state = store.get();
+      if (Object.keys(state.migrationPending || {}).length) {
+        ctx.alert('旧位置仍有未解决的锁区、安全关联或容量问题，请先处理；原档案与完整物品已保留，暂不另存新快照。', 'warning');
+        return;
+      }
+      const sync = state.sync || planner.computeSync(state.room, state.items, state.placements, { owner: state.owner });
       if (!Number.isFinite(sync?.total)) throw new Error('invalid sync');
       let source = null;
       try { source = ctx.scene?.snapshot?.() ?? null; } catch { /* 缩略图失败不影响文字档案。 */ }
@@ -137,7 +148,7 @@ export function mount(el, ctx) {
       if (active && unchanged) selectedId = snapshot.id;
       store.set({ snapshots: [...latestState.snapshots, snapshot], ...(unchanged ? { sync } : {}) });
       if (active && nameInput.value.trim() === label) nameInput.value = '';
-      ctx.alert(`已保存「${label}」：同步率 ${sync.total}%。`, 'success');
+      ctx.alert(`已保存「${label}」：同步率 ${sync.total}%。${notices.length ? '请展开「布局复核」核对说明。' : ''}`, notices.length ? 'warning' : 'success');
     } catch { ctx.alert('快照保存失败，请检查当前布局数据。', 'error'); }
     finally {
       saving = false;
@@ -151,7 +162,7 @@ export function mount(el, ctx) {
     // 再次载入示例只替换同 ID 的示例记录，保留用户自己保存的快照。
     const snapshots = [...store.get().snapshots.filter(snapshot => !presetIds.has(snapshot.id)), ...clone(presets)];
     store.set({ snapshots });
-    if (loadSnapshot(presets[0].id)) ctx.alert(`已载入 ${presets.length} 个成长快照。`, 'success');
+    if (loadSnapshot(presets[0].id)) ctx.alert(`已载入 ${presets.length} 个成长快照。${migrationNotices.length ? '请展开「布局复核」核对说明。' : ''}`, migrationNotices.length ? 'warning' : 'success');
   }
 
   function replayNext() {
@@ -216,7 +227,10 @@ export function mount(el, ctx) {
     records.innerHTML = snapshots.length ? snapshots.map(snapshot => `<button class="growth-record${snapshot.id === selectedId ? ' active' : ''}" type="button" data-snapshot="${esc(snapshot.id)}" aria-pressed="${snapshot.id === selectedId}"${state.timer?.running ? ' disabled' : ''}>${isSnapshotThumb(snapshot.thumb) ? `<img src="${esc(snapshot.thumb)}" alt="${esc(snapshot.label)}" width="64" height="40" loading="lazy" style="object-fit:contain;flex-shrink:0">` : ''}<span class="growth-record-label"><strong>${esc(snapshot.label)}</strong><small>${esc(semesterLabel(snapshot.semester))} · ${snapshot.items.length} 件物品 · ${snapshot.focusMinutes} min</small></span><span class="growth-record-sync mono">${snapshot.sync}<small>%</small></span></button>`).join('') : '<p class="empty">暂无快照。</p>';
     timeline.innerHTML = snapshots.length ? snapshots.map(snapshot => `<button class="growth-node${snapshot.id === selectedId ? ' active' : ''}" type="button" data-snapshot="${esc(snapshot.id)}" title="${esc(snapshot.label)}" aria-label="${esc(snapshot.label)}，同步率 ${snapshot.sync}%，${esc(semesterLabel(snapshot.semester))}" aria-pressed="${snapshot.id === selectedId}"${state.timer?.running ? ' disabled' : ''}><span class="growth-node-sync mono">${snapshot.sync}%</span>${isSnapshotThumb(snapshot.thumb) ? `<img src="${esc(snapshot.thumb)}" alt="${esc(snapshot.label)}" width="48" height="24" loading="lazy" style="object-fit:contain;display:block">` : '<i aria-hidden="true"></i>'}<span class="growth-node-semester">${esc(semesterLabel(snapshot.semester))}</span></button>`).join('') : '<span class="hint growth-timeline-empty">暂无快照</span>';
     current.classList.toggle('playing', playing);
-    current.innerHTML = selected ? `<span class="micro">${playing ? '回放 / ' : ''}${esc(semesterLabel(selected.semester))}</span><strong>${esc(selected.label)}</strong><small>${selected.items.length} 件物品 · 快照同步率 ${selected.sync}%</small>` : '<strong>当前布局</strong>';
+    current.innerHTML = selected ? `<span class="micro">${playing ? '回放 / ' : ''}${esc(semesterLabel(selected.semester))}</span><strong>${esc(selected.label)}</strong><small>${state.items.length} 件物品 · 历史 ${selected.sync}% · 当前复核 ${state.sync?.total ?? '—'}%</small>` : '<strong>当前布局</strong>';
+    migration.hidden = !migrationNotices.length;
+    migration.querySelector('summary').textContent = `布局复核 · ${migrationNotices.length} 项说明`;
+    migration.querySelector('ul').innerHTML = migrationNotices.map(text => `<li>${esc(text)}</li>`).join('');
     if (focusId) [...focusHost.querySelectorAll('[data-snapshot]')].find(button => button.dataset.snapshot === focusId)?.focus({ preventScroll: true });
   }
 

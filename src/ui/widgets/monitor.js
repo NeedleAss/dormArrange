@@ -108,7 +108,17 @@ export function mountMonitor(el, { store, planner }) {
   function renderTribunal(s) {
     const sync = s.sync;
     const assessed = !!sync?.votes && Number.isFinite(sync.total);
-    const notes = Array.isArray(sync?.notes) ? sync.notes : [];
+    const notes = Array.isArray(sync?.notes) ? [...sync.notes] : [];
+    const occupants = s.room?.params?.occupants || [];
+    for (const item of s.items || []) {
+      const verdict = s.fitReport?.verdicts?.[item.id];
+      if (verdict && ['overflow', 'banned'].includes(verdict.status)) {
+        notes.push(`${item.name}：${[...(verdict.reasons || []), ...(verdict.suggestions || [])].join('；')}`);
+      }
+      if (occupants.length && item.owner !== 'pub' && !occupants.includes(item.owner)) {
+        notes.push(`${item.name}：仍保留 ${item.owner} 归属；当前房型没有该床位，请核对。`);
+      }
+    }
     const allApproved = assessed && voteLabels.every(([key]) => sync.votes[key] === true);
     const approvals = assessed ? voteLabels.filter(([key]) => sync.votes[key] === true).length : null;
     tribunal.innerHTML = `${renderTribunalBoard(sync)}<div class="monitor-verdict ${allApproved ? 'approved' : assessed ? 'denied' : 'pending'}"><span>${allApproved ? '三审通过' : assessed ? '审议未通过' : '等待规划'}</span><b>${approvals === null ? '—' : approvals}<small>/3</small></b></div>${notes.length ? `<details class="monitor-note"><summary>审议依据</summary><p class="monitor-vote-notes">${esc(notes.join(' / '))}</p></details>` : ''}`;
@@ -161,7 +171,7 @@ export function mountMonitor(el, { store, planner }) {
   const unsubscribers = [
     store.subscribe(renderSync, ['sync']),
     store.subscribe(renderHistory, ['syncHistory']),
-    store.subscribe(renderTribunal, ['sync']),
+    store.subscribe(renderTribunal, ['sync', 'fitReport', 'items', 'room']),
     store.subscribe(renderZones, ['room', 'owner', 'items', 'placements', 'zoneStatus', 'lockedZones', 'selection']),
     store.subscribe(renderAlerts, ['alerts'])
   ];

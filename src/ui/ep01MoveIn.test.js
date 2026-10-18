@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as planner from '../planner/index.js';
 import { createStore, createInitialState } from '../core/store.js';
 import { mount, unmount } from './panels/ep01MoveIn.js';
+import { migrateLayout } from './layoutMigration.js';
 
 /** 用轻量节点驱动真实面板回调，验证规划结果与观众提示之间的接线。 */
 function setup(t, items = [], ai = null) {
@@ -29,6 +30,24 @@ test('新生预设有禁用项而没有容量溢出时，完成提示仍为警�
   assert.equal(alerts.at(-1).level, 'warning');
   assert.match(alerts.at(-1).text, /1.*安全/);
   assert.doesNotMatch(alerts.at(-1).text, /没有放不下/);
+});
+
+test('入住重新规划仍保留已迁移锁区的原位置依据，解锁后才允许重排', async t => {
+  const room = planner.buildRoom();
+  const item = planner.makeItem('luggage-24', { id: 'locked-in-move-in' });
+  const { store, plan } = setup(t, [item]);
+  store.set(migrateLayout(planner, { ...store.get(), lockedZones: ['A.bedFoot'], placements: {
+    [item.id]: { itemId: item.id, zoneId: 'A.bedFoot', box: { ...room.zones.find(zone => zone.id === 'A.bedFoot').box, ...item.size },
+      rot: 0, lying: false, layer: 0 }
+  } }).patch);
+  await plan();
+  assert.equal(store.get().placements[item.id], undefined);
+  assert.equal(store.get().fitReport.verdicts[item.id].status, 'overflow');
+  assert.ok(store.get().migrationPending[item.id]);
+  store.set({ lockedZones: [] });
+  await plan();
+  assert.ok(store.get().placements[item.id]);
+  assert.equal(store.get().migrationPending[item.id], undefined);
 });
 
 test('待核实、通用风险与校规禁用在同一安全分组内保留不同依据', async t => {

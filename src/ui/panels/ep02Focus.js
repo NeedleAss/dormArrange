@@ -1,4 +1,5 @@
 import { esc, clone, syncPatch } from '../helpers.js';
+import { migrateLayout } from '../layoutMigration.js';
 let cleanup = () => {};
 const starts = new WeakMap();
 const startItems = new WeakMap();
@@ -7,6 +8,18 @@ const startItems = new WeakMap();
 export function mount(el, ctx) {
   const { store, planner } = ctx;
   if (!planner) { el.innerHTML = '<p class="empty">规划模块加载中</p>'; return; }
+  const hadPlan = !!store.get().movePlan;
+  let reviewNotices = [];
+  try {
+    const migration = migrateLayout(planner, store.get());
+    reviewNotices = migration.notices;
+    store.set(migration.patch);
+  } catch {
+    store.set({ movePlan: null, tdmPlan: null, stepIndex: 0 });
+    el.innerHTML = '<p class="empty">旧布局尚未通过复核，请回到入住页面重新规划后再腾桌。</p>';
+    ctx.alert?.('旧布局复核未完成，物品已保留，旧腾桌步骤已停用。', 'warning');
+    return;
+  }
   let controller = null;
   let playbackPlan = null;
   let playing = false;
@@ -24,24 +37,25 @@ export function mount(el, ctx) {
     const s = store.get(); const plan = playbackPlan || s.movePlan;
     const wasPlaying = playing;
     stopPlayback();
-    if (wasPlaying && plan) store.set({ placements: planner.applySteps(starts.get(plan) || s.placements, plan.steps, s.stepIndex), items: itemsAfter(plan, s.stepIndex) });
+    // 布局已被迁移或替换时只取消动画，不能把旧步骤的位置再写回新房间。
+    if (wasPlaying && plan && s.movePlan === plan) store.set({ placements: planner.applySteps(starts.get(plan) || s.placements, plan.steps, s.stepIndex), items: itemsAfter(plan, s.stepIndex) });
   }
   function itemsAfter(plan, upto) {
     const disposed = new Set(plan.steps.slice(0, upto).filter(step => step.kind === 'dispose').map(step => step.itemId));
     return (startItems.get(plan) || store.get().items).filter(item => !disposed.has(item.id));
   }
   function seek(index) {
-    const s = store.get(); const plan = s.movePlan; if (!plan) return;
+    const s = store.get(); const plan = s.movePlan; if (!plan || !starts.has(plan)) return;
     stopPlayback();
     const upto = Math.max(0, Math.min(Number(index), plan.steps.length));
     const placements = planner.applySteps(starts.get(plan) || s.placements, plan.steps, upto);
     const items = itemsAfter(plan, upto);
-    const itemStates = Object.fromEntries(items.map(item => [item.id, plan.conflicts.includes(item.id) ? 'conflict' : 'fits']));
+    const itemStates = Object.fromEntries(items.map(item => [item.id, planner.checkRules?.(item)?.banned ? 'banned' : !placements[item.id] ? 'overflow' : plan.conflicts.includes(item.id) ? 'conflict' : 'fits']));
     plan.steps.slice(0,upto).forEach(step => { itemStates[step.itemId] = step.kind === 'dispose' ? 'stored' : 'moved'; });
     if (upto === plan.steps.length) {
-      store.set({ items, placements: plan.placementsAfter, stepIndex: upto, itemStates,
+      store.set({ items, placements: plan.placementsAfter, stepIndex: upto, itemStates, fitReport: null,
         ...syncPatch(ctx, plan.placementsAfter, '腾桌完成', { focusBox: plan.focusBox, moves: plan.steps.length }, items) });
-    } else store.set({ items, placements, stepIndex: upto, itemStates,
+    } else store.set({ items, placements, stepIndex: upto, itemStates, fitReport: null,
       ...syncPatch(ctx, placements, '腾桌进度', { focusBox: plan.focusBox, moves: upto }, items) });
   }
   function finish(plan) {
@@ -51,7 +65,7 @@ export function mount(el, ctx) {
     ctx.alert(plan.unresolved.length ? `已执行可行步骤，仍有 ${plan.unresolved.length} 件待处理。` : '专注力场已净空，可以开始专注。', plan.unresolved.length ? 'warning' : 'success');
   }
   function togglePlayback() {
-    const s = store.get(); const plan = s.movePlan; if (!plan?.steps.length) return;
+    const s = store.get(); const plan = s.movePlan; if (!plan?.steps.length || !starts.has(plan)) return;
     if (playing && !paused) { controller?.pause?.(); clearTimeout(fallbackTimer); paused = true; render(store.get()); return; }
     if (playing && paused && controller) { controller.resume?.(); paused = false; render(store.get()); return; }
     let start = s.stepIndex;
@@ -115,7 +129,7 @@ export function mount(el, ctx) {
       const plan = planner.planFocusField(s.room, s.items, s.placements, s.focusSpec, { lockedZones: s.lockedZones });
       starts.set(plan, clone(s.placements));
       startItems.set(plan, s.items);
-      const itemStates = Object.fromEntries(s.items.map(item => [item.id, plan.conflicts.includes(item.id) ? 'conflict' : 'fits']));
+      const itemStates = Object.fromEntries(s.items.map(item => [item.id, planner.checkRules?.(item)?.banned ? 'banned' : !s.placements[item.id] ? 'overflow' : plan.conflicts.includes(item.id) ? 'conflict' : s.itemStates[item.id] || 'fits']));
       // 展开只展示预测，当前同步率仍由尚未移动的物品位置计算。
       store.set({ movePlan: plan, stepIndex: 0, itemStates, ...syncPatch(ctx, s.placements, '腾桌展开', { focusBox: plan.focusBox, moves: 0 }) });
       ctx.alert(plan.conflicts.length ? `专注区检测到 ${plan.conflicts.length} 件冲突物品，生成 ${plan.steps.length} 步指令。` : '专注区已经净空。', plan.conflicts.length ? 'warning' : 'success');
@@ -149,6 +163,14 @@ export function mount(el, ctx) {
   };
   document.addEventListener('keydown', onShortcut);
   const unsubscribe = store.subscribe(render, ['movePlan', 'stepIndex', 'items', 'focusSpec', 'placements']);
+  if (reviewNotices.length) {
+    const review = document.createElement('details');
+    review.className = 'hint';
+    review.innerHTML = `<summary>布局复核 / ${reviewNotices.length} 项</summary><ul>${reviewNotices.map(note => `<li>${esc(note)}</li>`).join('')}</ul>`;
+    el.prepend(review);
+  }
+  // 回到腾桌页时从迁移后的真实位置重算，不恢复旧终点或旧播放进度。
+  if (hadPlan && store.get().items.length) el.querySelector('#deploy').onclick();
   render(store.get());
   cleanup = () => {
     active = false;

@@ -1,4 +1,5 @@
 import { esc, clone } from '../helpers.js';
+import { layoutExisting, layoutLockedZone, rejectedPlacements } from '../layoutMigration.js';
 let cleanup = () => {};
 let draft = '';
 const manifests = new WeakMap();
@@ -23,8 +24,7 @@ export function mount(el, ctx) {
   const text = el.querySelector('#items-text');
   const identity = item => `${item.owner}|${item.category}|${item.libId || item.name.trim().toLowerCase()}`;
   function fixedBaseline(state) {
-    const locked = new Set(state.lockedZones);
-    const items = state.items.filter(item => item.owner !== state.owner || locked.has(state.placements[item.id]?.zoneId));
+    const items = state.items.filter(item => item.owner !== state.owner || layoutLockedZone(state, item.id));
     const ids = new Set(items.map(item => item.id));
     return { items, placements: Object.fromEntries(Object.entries(state.placements).filter(([id]) => ids.has(id))) };
   }
@@ -39,6 +39,7 @@ export function mount(el, ctx) {
     const nextIds = new Set(nextItems.map(item => item.id));
     for (const id of manifest.origins.keys()) if (!nextIds.has(id)) manifest.origins.delete(id);
     store.set({ items: nextItems, placements: fixed.placements,
+      migrationPending: Object.fromEntries(Object.entries(state.migrationPending || {}).filter(([id]) => nextIds.has(id))),
       itemStates: Object.fromEntries(fixed.items.map(item => [item.id, state.itemStates[item.id] || 'fits'])),
       fitReport: null, movePlan: null, tdmPlan: null, sync: null, selection: null });
   }
@@ -46,7 +47,7 @@ export function mount(el, ctx) {
     const state = store.get();
     const item = state.items.find(entry => entry.id === itemId);
     if (item?.owner !== state.owner) return '这是其他使用者的物品，请先切换到对应使用者再编辑。';
-    if (state.lockedZones.includes(state.placements[itemId]?.zoneId)) return '物品所在分区已锁定，请先解锁再编辑或移除。';
+    if (layoutLockedZone(state, itemId)) return '物品所在分区已锁定，请先解锁再编辑或移除。';
     return null;
   }
   function restoreEditor(openIds) {
@@ -131,8 +132,10 @@ export function mount(el, ctx) {
     if (text.value.trim() && (manifest.parsedDraft !== text.value || manifest.owner !== current.owner || manifest.items !== current.items) && !await parse()) return;
     const s = store.get(); if (!s.items.length) return;
     try {
-      const report = planner.planMoveIn(s.room, s.items, { owner: s.owner, lockedZones: s.lockedZones, existing: fixedBaseline(s).placements });
+      const existing = layoutExisting({ ...s, placements: fixedBaseline(s).placements });
+      const report = planner.planMoveIn(s.room, s.items, { owner: s.owner, lockedZones: s.lockedZones, existing });
       store.set({ placements: report.placements, itemStates: Object.fromEntries(Object.entries(report.verdicts).map(([id,v]) => [id,v.status])), fitReport: report, sync: report.sync,
+        migrationPending: rejectedPlacements(s.items, existing, report.placements),
         syncHistory: [...s.syncHistory, { t: new Date().toISOString(), total: report.sync.total, label: '入住' }].slice(-60), movePlan: null, tdmPlan: null });
       const { banned, overflow } = report.summary;
       ctx.alert(banned ? `规划完成，${banned} 件物品被安全拦截或待核实，暂不安排位置。${overflow ? `另有 ${overflow} 件需要重新安排。` : ''}` : overflow ? `规划完成，${overflow} 件物品需要重新安排。` : '规划完成，没有放不下的物品。', banned || overflow ? 'warning' : 'success');

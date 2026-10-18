@@ -2,7 +2,12 @@
 export function createStore(initialState = {}) {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem('fangcun.v1') || '{}') || {}; } catch { /* 存储受限时仍可使用。 */ }
+  // 兼容早期整份布局存档：只读取并原样保留已有字段，不再保存新的活动布局或旧步骤。
+  const legacy = Array.isArray(saved.items) ? Object.fromEntries(['items', 'placements', 'owner', 'lockedZones']
+    .filter(key => Object.hasOwn(saved, key)).map(key => [key, saved[key]])) : {};
   let state = Object.freeze({ ...initialState,
+    ...(legacy.items ? { items: legacy.items, placements: legacy.placements || {},
+      owner: legacy.owner || initialState.owner, lockedZones: legacy.lockedZones || [] } : {}),
     roomParams: saved.roomParams || initialState.roomParams,
     snapshots: Array.isArray(saved.snapshots) ? saved.snapshots : initialState.snapshots,
     focusMinutes: Number.isFinite(saved.focusMinutes) ? saved.focusMinutes : initialState.focusMinutes });
@@ -14,7 +19,7 @@ export function createStore(initialState = {}) {
       if (!changed.length) return;
       state = Object.freeze({ ...state, ...patch });
       if (changed.some(key => ['roomParams', 'snapshots', 'focusMinutes'].includes(key))) {
-        try { localStorage.setItem('fangcun.v1', JSON.stringify({ roomParams: state.roomParams, snapshots: state.snapshots, focusMinutes: state.focusMinutes })); } catch { /* 配额不足不阻塞操作。 */ }
+        try { localStorage.setItem('fangcun.v1', JSON.stringify({ ...legacy, roomParams: state.roomParams, snapshots: state.snapshots, focusMinutes: state.focusMinutes })); } catch { /* 配额不足不阻塞操作。 */ }
       }
       for (const entry of [...listeners]) {
         // 话切换可能在同一轮广播中卸载旧面板，不再调用已取消的订阅。
@@ -38,7 +43,7 @@ export function createInitialState(planner) {
   const roomParams = planner?.DEFAULT_PARAMS ? structuredClone(planner.DEFAULT_PARAMS) : null;
   return {
     episode: 'EP00', owner: 'A', roomParams, room: planner?.buildRoom?.(roomParams) || null,
-    items: [], placements: {}, itemStates: {}, lockedZones: [], zoneStatus: {}, fitReport: null,
+    items: [], placements: {}, itemStates: {}, lockedZones: [], zoneStatus: {}, fitReport: null, migrationPending: {},
     focusSpec: { zoneId: 'A.desk', w: 75, d: 35 }, movePlan: null, stepIndex: 0,
     month: 9, tdm: true, tdmPlan: null, snapshots: [], focusMinutes: 0,
     timer: { running: false }, sync: null, syncHistory: [], selection: null,

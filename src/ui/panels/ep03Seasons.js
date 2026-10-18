@@ -1,4 +1,5 @@
 import { esc, syncPatch } from '../helpers.js';
+import { migrateLayout } from '../layoutMigration.js';
 import '../../styles/seasons.css';
 
 const MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
@@ -27,10 +28,15 @@ export function mount(el, ctx) {
   let appliedMonth = null;
   let transition = '';
   let error = '';
+  let migrating = false;
+  let needsMigration = true;
+  let migrationNotices = [];
+  let seasonBlocks = [];
 
   el.innerHTML = `<div class="season-empty"><button class="btn full" data-season-example>载入换季示例</button></div>
     <label class="season-tdm"><span><b>时分复用</b></span><input type="checkbox" data-season-tdm></label>
     <div class="season-status" role="status" aria-live="polite"></div>
+    <div class="season-migration-notices" role="status" aria-live="polite"></div>
     <div class="season-month-card"><div><span class="micro">当前月份</span><strong class="season-month-number">09<small>月</small></strong></div><p class="season-month-state"></p></div>
     <button class="btn full" data-season-play>播放全年</button>
     <div class="section-title">时空占用谱</div>
@@ -65,6 +71,12 @@ export function mount(el, ctx) {
     const plan = state.tdmPlan;
     const next = plan?.byMonth[month];
     if (!next) return;
+    if (seasonBlocks.length) {
+      stopPlayback();
+      error = '存在锁区或安全依赖冲突，已保留复核后的布局；处理后再计算换季。';
+      render(state);
+      return;
+    }
     if (manual) stopPlayback();
     if (plan === appliedPlan && month === appliedMonth) {
       if (zoneId) store.set({ selection: zoneId });
@@ -77,7 +89,7 @@ export function mount(el, ctx) {
       const stored = new Set(next.stored);
       const overflow = new Set(next.overflow);
       const itemStates = Object.fromEntries(state.items.map(item => [item.id,
-        overflow.has(item.id) ? 'overflow' : stored.has(item.id) ? 'stored' : next.placements[item.id] ? 'fits' : planner.checkRules?.(item).banned ? 'banned' : 'overflow']));
+        planner.checkRules?.(item)?.banned ? 'banned' : overflow.has(item.id) ? 'overflow' : stored.has(item.id) ? 'stored' : next.placements[item.id] ? 'fits' : 'overflow']));
       const sync = planner.computeSync ? syncPatch(ctx, next.placements, `${month} 月换季`, { owner: state.owner, swaps: nextSteps.length }) : { sync: null };
       transition = appliedMonth !== null ? `${appliedMonth} → ${month} 月` : `${month} 月 · 当前布局`;
       steps = nextSteps;
@@ -97,10 +109,12 @@ export function mount(el, ctx) {
 
   /** 延后计算以先绘制“计算中”；每次输入变化只产生一份全年计划。 */
   function scheduleCalculation(_state, changed = []) {
-    if (!active) return;
+    if (!active || migrating) return;
     stopPlayback();
     clearTimeout(calculation);
-    if (changed.some(key => ['room', 'items', 'owner'].includes(key))) {
+    if (changed.some(key => ['room', 'items', 'owner', 'lockedZones'].includes(key))) {
+      needsMigration = true;
+      migrationNotices = [];
       appliedMonthPlan = null;
       appliedPlan = null;
       appliedMonth = null;
@@ -109,6 +123,7 @@ export function mount(el, ctx) {
     }
     const token = ++revision;
     error = '';
+    seasonBlocks = [];
     busy = !!store.get().items.length && !!store.get().room;
     store.set({ tdmPlan: null });
     render(store.get());
@@ -116,9 +131,19 @@ export function mount(el, ctx) {
     calculation = setTimeout(() => {
       calculation = null;
       if (!active || token !== revision) return;
-      const state = store.get();
       try {
-        const plan = planner.planSeasons(state.room, state.items, { owner: state.owner, tdm: state.tdm, months: MONTHS, compare: true });
+        if (needsMigration) {
+          // 每次进入或变更物品、房型、锁区时先复核全量布局，不复用旧月计划坐标。
+          const migrated = migrateLayout(planner, store.get());
+          migrationNotices = migrated.notices;
+          migrating = true;
+          try { store.set(migrated.patch); } finally { migrating = false; }
+          needsMigration = false;
+        }
+        const state = store.get();
+        const plan = planner.planSeasons(state.room, state.items, { owner: state.owner, lockedZones: state.lockedZones,
+          tdm: state.tdm, months: MONTHS, compare: true });
+        seasonBlocks = blockingReasons(state, plan);
         if (!active || token !== revision) return;
         store.set({ tdmPlan: plan });
         busy = false;
@@ -130,6 +155,31 @@ export function mount(el, ctx) {
         render(store.get());
       }
     }, 32);
+  }
+
+  /** 全年接口没有 existing，不能让重算偷偷搬走合法锁区原位或未解决的安全依赖。 */
+  function blockingReasons(state, plan) {
+    const reasons = [];
+    for (const item of state.items) {
+      const verdict = state.fitReport?.verdicts[item.id];
+      if (verdict?.status === 'overflow' && verdict.reasons?.some(reason => /锁定|安全拦截|危险物|人工确认/.test(reason))) {
+        reasons.push(`${item.name}：${verdict.reasons.join('；')}`);
+      }
+      let placement = state.placements[item.id];
+      const visited = new Set();
+      let locked = false;
+      while (placement && !visited.has(placement.zoneId)) {
+        visited.add(placement.zoneId);
+        if (state.lockedZones?.includes(placement.zoneId)) { locked = true; break; }
+        const zone = state.room.zones.find(entry => entry.id === placement.zoneId);
+        const parentId = zone?.parentItemId || (placement.zoneId.endsWith('.inside') ? placement.zoneId.slice(0, -7) : null);
+        placement = parentId ? state.placements[parentId] : null;
+      }
+      if (locked && plan.months.some(month => JSON.stringify(plan.byMonth[month].placements[item.id]) !== JSON.stringify(state.placements[item.id]))) {
+        reasons.push(`${item.name}：全年方案会改变已锁区内的原位置，请先解锁对应分区再计算。`);
+      }
+    }
+    return [...new Set(reasons)];
   }
 
   function renderHeatmap(state) {
@@ -177,9 +227,17 @@ export function mount(el, ctx) {
     exampleButton.textContent = hasItems ? '载入换季示例（会替换当前物品）' : '载入换季示例';
     el.querySelector('.season-status').textContent = error || (busy ? '计算中…' : !state.room ? '宿舍模板加载中' : !hasItems ? '载入示例或添加物品。' : `${state.items.length} 件物品`);
     el.querySelector('.season-status').classList.toggle('error', !!error);
+    const unresolved = monthly?.overflow.map(id => {
+      const item = state.items.find(entry => entry.id === id);
+      const rule = item && planner.checkRules?.(item);
+      return `${item?.name || id}：${rule?.banned ? rule.reason : '本月没有可用的合法位置，请核对尺寸、容量和锁区。'}`;
+    }) || [];
+    const notices = [...new Set([...migrationNotices, ...seasonBlocks, ...unresolved])];
+    el.querySelector('.season-migration-notices').innerHTML = notices.length
+      ? `<details open><summary>布局复核 · ${notices.length} 项</summary><ul>${notices.map(notice => `<li>${esc(notice)}</li>`).join('')}</ul></details>` : '';
     el.querySelector('.season-month-number').innerHTML = `${String(state.month).padStart(2, '0')}<small>月</small>`;
     el.querySelector('.season-month-state').innerHTML = monthly ? `<span>当季 <b>${monthly.active.length}</b> 件</span><span>非当季 <b>${monthly.stored.length}</b> 件</span><span class="${monthly.overflow.length ? 'red' : ''}">滞留 <b>${monthly.overflow.length}</b> 件</span>` : '<span>等待月度计划</span>';
-    playButton.disabled = busy || !plan;
+    playButton.disabled = busy || !plan || !!seasonBlocks.length;
     playButton.textContent = playing ? '停止播放' : '播放全年';
     slider.disabled = busy || !plan;
     slider.value = Math.max(0, MONTHS.indexOf(state.month));
@@ -237,11 +295,8 @@ export function mount(el, ctx) {
     if (ctx.setSeasonMonth === applyMonth) delete ctx.setSeasonMonth;
     slider.oninput = null;
   };
-  const state = store.get();
-  render(state);
-  if (state.tdmPlan?.tdm === state.tdm && state.items.length && state.room) {
-    applyMonth(state.tdmPlan.byMonth[state.month] ? state.month : MONTHS[0], { manual: false });
-  } else scheduleCalculation();
+  // 即使缓存标记相同也不沿用旧 byMonth，床尾终点和四床拓扑都可能已过期。
+  scheduleCalculation();
 }
 
 export function unmount() { cleanup(); cleanup = () => {}; }

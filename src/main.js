@@ -20,6 +20,7 @@ import { mountMonitor } from './ui/widgets/monitor.js';
 import { createFocusTimer } from './ui/widgets/focusTimer.js';
 import { createIdleDemo } from './ui/idleDemo.js';
 import { installErrorBoundary } from './ui/errorBoundary.js';
+import { migrateLayout } from './ui/layoutMigration.js';
 import './styles/spatial.css';
 import './styles/monitorDock.css';
 import './styles/typography.css';
@@ -34,16 +35,24 @@ async function load(path) { try { return await loaders[path]?.(); } catch { retu
 async function main() {
 const planner = await load('./planner/index.js');
 const store = createStore(createInitialState(planner));
+let startupNotices = [];
 try {
   if (planner && store.get().roomParams) {
-    const room = planner.buildRoom(store.get().roomParams);
-    // 旧存档先经过模板归一化，再把实际床位和房型名称写回持久化参数。
-    store.set({ room, roomParams: structuredClone(room.params) });
+    const { patch, notices } = migrateLayout(planner, store.get());
+    startupNotices = notices;
+    store.set({ ...patch, ...(patch.sync ? { syncHistory: [{ t: new Date().toISOString(), total: patch.sync.total, label: '存档复核' }] } : {}) });
   }
-} catch { /* 无效持久化参数回到初始模板。 */ store.set(createInitialState(planner)); }
+} catch {
+  // 参数损坏时只重建可用外壳，原物品、锁区、时长和历史快照仍保留供人工核对。
+  const room = planner?.buildRoom?.();
+  store.set({ room, roomParams: room?.params || null, placements: {}, fitReport: null, sync: null,
+    movePlan: null, stepIndex: 0, tdmPlan: null, selection: null });
+  startupNotices = ['旧存档暂时无法完整复核，物品和历史快照已保留，请检查房型与尺寸后重新规划。'];
+}
 const shell = mountShell(document.querySelector('#app'), store);
 const alert = (text, level = 'info') => store.set({ alerts: [{ id: crypto.randomUUID(), level, text, t: new Date().toISOString() }, ...store.get().alerts].slice(0, 6) });
 boundary.connectAlert(alert);
+if (startupNotices.length) alert(startupNotices.join('；'), 'warning');
 let scene = null;
 const sceneModule = await load('./scene/index.js');
 try {
