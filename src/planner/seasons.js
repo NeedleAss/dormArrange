@@ -5,14 +5,16 @@
 
 import { buildEngines, cloneEngines, commitSpot, compressedItem, zoneFill, itemMap } from './engines.js';
 import { Heightmap } from './heightmap.js';
-import { rankZones } from './rank.js';
+import { hardOk, rankZones } from './rank.js';
 import { planMoveIn, placeFirstFit } from './moveIn.js';
 import { checkRules } from './checkRules.js';
+import { placementViolation, lockedPlacementZone } from './placementPolicy.js';
+import { insideZoneFor } from './inside.js';
+export { insideZoneFor };
 import { boxToLocal, volume, dist } from './geometry.js';
 import { shortLabel } from './focusField.js';
 
 const DEFAULT_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
-const INSIDE_ACCEPTS = ['clothes', 'bedding', 'storage', 'misc', 'sport', 'appliance'];
 const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const byVolDesc = (a, b) => volume(b.size) - volume(a.size) || byStr(a.id, b.id);
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -20,31 +22,12 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 export const activeAt = (it, m) => !it.months || it.months.includes(m);
 const isSeasonal = (it) => Array.isArray(it.months) && it.months.length > 0 && it.months.length < 12;
 
-/**
- * 由行李箱的 placement 生成 inside 分区（docs/05 §2.7）：按 container 尺寸居中内缩，放倒时按放倒后的方向对应。
- */
-export function insideZoneFor(item, pl, parentZone) {
-  const c = item.flags.container;
-  const s = item.size, b = pl.box;
-  const near = (x, y) => Math.abs(x - y) < 0.05;
-  // 世界 y 对应物品的哪一维
-  let ky = 'h';
-  if (pl.lying) ky = near(b.h, s.d) && !near(b.h, s.w) ? 'd' : near(b.h, s.w) ? 'w' : 'd';
-  const rest = ['w', 'd', 'h'].filter((k) => k !== ky);
-  // 世界 x 对应剩下两维中与 b.w 相等的那一维
-  const kx = near(b.w, s[rest[0]]) ? rest[0] : rest[1];
-  const kz = rest[0] === kx ? rest[1] : rest[0];
-  const cx = Math.min(c[kx], b.w), cz = Math.min(c[kz], b.d), cy = Math.min(c[ky], b.h);
-  return {
-    id: `${item.id}.inside`, slot: 'inside', label: `${item.name}里`, owner: item.owner, kind: 'inside',
-    box: { x: b.x + (b.w - cx) / 2, y: b.y + (b.h - cy) / 2, z: b.z + (b.d - cz) / 2, w: cx, d: cz, h: cy },
-    front: parentZone?.front ?? '+x', tier: 2, accepts: [...INSIDE_ACCEPTS], stackable: true, parentItemId: item.id
-  };
-}
-
 /** 尝试把物品放回上个月的原位（同分区、同局部矩形仍空闲） */
-function tryPrev(eng, item, prevPl, compressed) {
+function tryPrev(eng, item, prevPl, compressed, ctx) {
   if (!prevPl || !eng || prevPl.compressed !== compressed) return null;
+  // 原位复用也必须重过硬约束，不能借上月位置绕过锁区、床品或箱内祖先限制。
+  if (!hardOk(item, eng.zone, ctx) || placementViolation(ctx.room, item, prevPl, ctx.placements, ctx.items) ||
+      lockedPlacementZone(prevPl, ctx.placements, ctx.room, ctx.lockedZones)) return null;
   if (eng.kind === 'rail') {
     const off = (eng.axis === 'x' ? prevPl.box.x : prevPl.box.z) - eng.start;
     const spot = eng.tryAt(item, off);
@@ -86,7 +69,9 @@ export function planSeasons(room, items, opts = {}) {
   if (tdm) {
     for (const it of [...anchors].sort((a, b) => byStr(a.id, b.id))) {
       const p = basePlacements[it.id];
-      if (p && it.flags?.container) insideZones.push(insideZoneFor(it, p, zoneById.get(p.zoneId)));
+      if (p && it.flags?.container && !placementViolation(room, it, p, basePlacements, anchors)) {
+        insideZones.push(insideZoneFor(it, p, zoneById.get(p.zoneId)));
+      }
     }
   }
   const allZones = [...room.zones, ...insideZones];
@@ -117,13 +102,25 @@ export function planSeasons(room, items, opts = {}) {
       for (const it of group) {
         const v = variant(it);
         const pp = prev[it.id];
-        const ok = pp && (!tdm || prevState[it.id] === want);
-        const pl = ok ? tryPrev(eng[pp.zoneId], v.item, pp, v.comp) : null;
+        const ranked = candidates(v.item);
+        const ok = pp && (!tdm || prevState[it.id] === want) && ranked.some((r) => r.zone.id === pp.zoneId);
+        const pl = ok ? tryPrev(eng[pp.zoneId], v.item, pp, v.comp,
+          { ...ctx, room: roomPlus, placements: P, items }) : null;
         if (pl) { P[it.id] = pl; state[it.id] = want; } else rest.push(it);
       }
       for (const it of rest) {
         const v = variant(it);
-        const pl = placeFirstFit(v.item, candidates(v.item), eng, { compressed: v.comp })?.pl ?? null;
+        let pl = null;
+        for (const ranked of candidates(v.item)) {
+          const engine = eng[ranked.zone.id];
+          if (!engine || !hardOk(v.item, ranked.zone, ctx)) continue;
+          // 在副本上试摆，验证包含箱内祖先在内的床面限制后再提交；拒绝不能污染后续候选容量。
+          const trial = placeFirstFit(v.item, [ranked], { [ranked.zone.id]: engine.clone() }, { compressed: v.comp });
+          if (!trial || placementViolation(roomPlus, v.item, trial.pl, P, items) ||
+              lockedPlacementZone(trial.pl, P, roomPlus, lockedZones)) continue;
+          pl = commitSpot(engine, v.item, trial.spot, v.comp);
+          break;
+        }
         if (pl) { P[it.id] = pl; state[it.id] = want; } else overflow.push(it.id);
       }
     };
@@ -200,6 +197,7 @@ function zoneName(zoneId, room, items) {
  * @param {import('../core/types.js').MonthPlan} A
  * @param {import('../core/types.js').MonthPlan} B
  * @returns {import('../core/types.js').MoveStep[]}
+ * @throws {RangeError} 旧目标布局违反床面限制时，须先用 planSeasons 重算，不能生成违规移动指令。
  */
 export function diffMonths(A, B, items, room) {
   const byId = itemMap(items);
@@ -208,6 +206,8 @@ export function diffMonths(A, B, items, room) {
   const same = (p, q) => p.zoneId === q.zoneId && JSON.stringify(p.box) === JSON.stringify(q.box);
   for (const id of ids) {
     const pa = A.placements[id], pb = B.placements[id];
+    const issue = pb && placementViolation(room, byId[id], pb, B.placements, items);
+    if (issue) throw new RangeError(`换季目标「${byId[id]?.name ?? id}」无效：${issue}；请先用 planSeasons 重新规划该月`);
     if (pa && pb && same(pa, pb)) continue;
     const name = byId[id]?.name ?? id;
     const kind = A.stored.includes(id) && B.active.includes(id) ? 'retrieve'

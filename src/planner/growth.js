@@ -111,7 +111,7 @@ export function predictGrowth(items, room, opts = {}) {
   const what = growers[0]?.category === 'books' ? `${perSem} 本书` : `${Math.round(rate * 10) / 10} 件`;
   const text = !growers.length ? '没有会随学期增长的物品'
     : firstOverflow
-      ? `按每学期 +${what}的速度，${semesterLabel(firstOverflow.semester)}书架会满。建议届时把旧教材收进床尾箱`
+      ? `按每学期 +${what}的速度，${semesterLabel(firstOverflow.semester)}书架会满。建议届时整理旧教材，放入床外的合法收纳区或带回家`
       : `按每学期 +${what}的速度，${n} 个学期内书架都放得下`;
   return { semesters, fill, firstOverflow, text };
 }

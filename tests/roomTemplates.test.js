@@ -59,15 +59,22 @@ function freezeDeep(value) {
   return value;
 }
 
-test('紫荆参数和原入住/腾桌演示保持不变，Room采用已确认的正面直梯版本', () => {
+test('紫荆真实参数保持不变，新床面政策下入住/腾桌结果确定且几何合法', () => {
   const room = buildRoom();
   const move = planMoveIn(room, parseItemsText(PRESETS.freshman));
   const focus = planFocusField(room, PRESETS.messyDesk.items, PRESETS.messyDesk.placements);
   assert.equal(sha(DEFAULT_PARAMS), '889efc8de678269a7a430ae276108321a9e4de21514eeb5c1deb182bd57a6258');
-  assert.equal(sha(room), 'a8899720e66c72f3c1f9bac259065f65eba52bb001dcfb4228e5382309e0a7b5');
-  assert.equal(sha(move), '7794afb3c0278d0bda506a03530579e49d89e242a918bad7952be8503e754fea');
-  assert.equal(sha(focus), '474d5042d22fb888078b06dfd80394cd1fe17bb0c508bee2ec80a17e4a260a9d');
-  assert.deepEqual(move.summary, { fits: 22, relocate: 9, uncertain: 2, overflow: 0, banned: 1, total: 34 });
+  assert.deepEqual(planMoveIn(room, parseItemsText(PRESETS.freshman)), move);
+  assert.deepEqual(planFocusField(room, PRESETS.messyDesk.items, PRESETS.messyDesk.placements), focus);
+  assertValidPlacements(room, move.placements);
+  assertValidPlacements(room, focus.placementsAfter);
+  const byId = new Map([...parseItemsText(PRESETS.freshman), ...PRESETS.messyDesk.items].map((it) => [it.id, it]));
+  for (const p of [...Object.values(move.placements), ...Object.values(focus.placementsAfter)]) {
+    if (!['bed', 'bedFoot'].includes(room.zones.find((z) => z.id === p.zoneId)?.slot)) continue;
+    const item = byId.get(p.itemId);
+    assert.ok(item.category === 'bedding' || item.libId === 'bed-curtain', `${item.name} 不得落床`);
+  }
+  assert.deepEqual(move.summary, { fits: 24, relocate: 7, uncertain: 2, overflow: 0, banned: 1, total: 34 });
   assert.equal(focus.steps.length, 7);
   assert.equal(focus.metrics.syncBefore, 75);
   assert.equal(focus.metrics.syncAfter, 100);

@@ -37,7 +37,17 @@ const GUESS = [
   [['球', '拍', '琴', '垫'], 'sport']
 ];
 
+// 只识别明确床品词，不能因名称带“床”而把床头柜、床边收纳筐当床品。
+const BEDDING_WORDS = /床单|床笠|床罩|被套|枕套|枕巾|床褥|床垫|褥子|被子|棉被|凉被|冬被|枕头|毯子|毛毯|床品|床上用品|床帘|蚊帐/;
+const BEDDING_STORAGE = /收纳|储物|[箱盒袋柜筐篮架桌]/;
+const BEDDING_ACCESSORY = /清洁|清洗|除螨|消毒|洗涤|(?:床单|床帘|蚊帐|被角|被子|被套)夹|夹子|固定器|固定带|刷子?/;
+const isLinen = (frag) => BEDDING_WORDS.test(frag) && !BEDDING_STORAGE.test(frag) && !BEDDING_ACCESSORY.test(frag);
+const isLinenStorage = (frag) => BEDDING_WORDS.test(frag) && BEDDING_STORAGE.test(frag);
+
 export function guessCategory(frag) {
+  if (isLinenStorage(frag)) return 'storage';
+  if (BEDDING_WORDS.test(frag) && BEDDING_ACCESSORY.test(frag)) return 'misc';
+  if (isLinen(frag)) return 'bedding';
   for (const [kws, cat] of GUESS) if (kws.some((k) => frag.includes(k))) return cat;
   return 'misc';
 }
@@ -141,6 +151,10 @@ export function parseItemsText(text, opts = {}) {
 
     // 物品库匹配；有"寸"时在同一规格族里取最接近的一档
     let lib = matchLib(lower);
+    // “被子收纳袋”等容器不可借内部床品词匹配冬被；未入库的床品继续使用估计范围而非冒用物品库规格。
+    if (isLinenStorage(lower) && lib?.category === 'bedding') lib = null;
+    if (BEDDING_WORDS.test(lower) && BEDDING_ACCESSORY.test(lower) && (lib?.category === 'bedding' || lib?.libId === 'bed-curtain')) lib = null;
+    if (isLinen(lower) && lib && lib.category !== 'bedding' && lib.libId !== 'bed-curtain') lib = null;
     // 配件/说明书不能误匹配为其描述的禁用实体，同时保留名称供后续安全规则检查。
     if (lib && /保护套|说明书|科普书/.test(lower) && !checkRules({ name: frag }).banned &&
         checkRules({ name: lib.name, libId: lib.libId }).banned) lib = null;

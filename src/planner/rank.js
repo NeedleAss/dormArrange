@@ -1,6 +1,7 @@
 // 候选分区排序（docs/05 §3）：硬过滤 + 加权代价。复杂度 O(分区数 × 朝向数)。
 
 import { EPS, localExtents, orientations } from './geometry.js';
+import { isBedZone, isBedding } from './placementPolicy.js';
 
 /** freq → 理想 tier */
 export const IDEAL_TIER = Object.freeze({ daily: 0, weekly: 1, monthly: 1, seasonal: 2, rare: 2 });
@@ -9,18 +10,18 @@ export const idealTier = (item) => IDEAL_TIER[item.freq] ?? 1;
 
 /** 类别亲和表（docs/05 §3.3） */
 export const AFFINITY = Object.freeze({
-  luggage: ['underDesk', 'bedFoot', 'pubEntry', 'pubCorner', 'balcony'],
-  clothes: ['wardrobeHang', 'wardrobeBottom', 'bedFoot'],
+  luggage: ['underDesk', 'pubEntry', 'pubCorner', 'balcony'],
+  clothes: ['wardrobeHang', 'wardrobeBottom'],
   bedding: ['bed', 'bedFoot', 'wardrobeBottom'],
   books: ['hutch', 'desk', 'underDeskBack'],
   study: ['desk', 'hutch'],
   electronics: ['desk', 'hutch', 'underDeskBack'],
   appliance: ['desk', 'hutch', 'wardrobeBottom'],
   toiletry: ['sinkShelf', 'balcony', 'wardrobeBottom'],
-  storage: ['underDesk', 'underDeskBack', 'bedFoot', 'wardrobeBottom', 'pubEntry'],
+  storage: ['underDesk', 'underDeskBack', 'wardrobeBottom', 'pubEntry'],
   food: ['hutch', 'underDesk'],
-  sport: ['pubEntry', 'doorBack', 'balcony', 'bedFoot'],
-  decor: ['hutch', 'desk', 'bed'],
+  sport: ['pubEntry', 'doorBack', 'balcony'],
+  decor: ['hutch', 'desk'],
   misc: ['doorBack', 'underDesk', 'hutch', 'pubEntry'],
   trash: []
 });
@@ -42,9 +43,12 @@ export function sizeFits(item, zone, size) {
  * @param {{ lockedZones?: string[], skipSize?: boolean }} [ctx]
  */
 export function hardOk(item, zone, ctx = {}) {
+  // 此限制先于旧 accepts、用户 preferred 和亲和代价；床帘是精确库白名单。
+  const bed = isBedZone(zone);
+  if (bed && !isBedding(item)) return false;
   if (zone.kind === 'keepClear') return false;
   if (item.owner === 'pub' ? zone.owner !== 'pub' : (zone.owner !== item.owner && zone.owner !== 'pub')) return false;
-  if (!(zone.accepts.length === 1 && zone.accepts[0] === '*') && !zone.accepts.includes(item.category)) return false;
+  if (!bed && !(zone.accepts.length === 1 && zone.accepts[0] === '*') && !zone.accepts.includes(item.category)) return false;
   if (ctx.lockedZones?.includes(zone.id)) return false;
   if (zone.kind === 'hang' && !item.flags?.hangable) return false;
   if (!ctx.skipSize && !sizeFits(item, zone)) return false;
@@ -54,8 +58,7 @@ export function hardOk(item, zone, ctx = {}) {
 /**
  * 代价（docs/05 §3.2），越小越优先。
  * 规格空缺处的选择：分区在 item.preferred 里时 tierCost 记 0（再加 0.1 × 首选序号保持首选顺序）。
- * 否则按原公式，24 寸箱会因 tier 匹配被侧放到床尾（代价 1.5 < 桌下 3），与 docs/07 §4 / B2 测试的预期相反；
- * "首选"是物品库或用户的明确偏好，应当压过按频率推出的层级。
+ * "首选"是物品库或用户的明确偏好，在硬限制通过后压过按频率推出的层级。
  */
 export function zoneCost(item, zone, fill = 0) {
   const pi = item.preferred ? item.preferred.indexOf(zone.slot) : -1;

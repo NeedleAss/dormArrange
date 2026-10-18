@@ -17,9 +17,9 @@ export const LIBRARY = Object.freeze([
   { libId: 'luggage-28', name: '28寸行李箱', aliases: ['28寸'], category: 'luggage', size: s(48, 29, 77), sizeSource: 'product', freq: 'rare',
     flags: { canBearLoad: true, canLieDown: true, container: s(44, 25, 72) }, preferred: ['pubEntry', 'balcony'] },
   { libId: 'bag-move', name: '折叠搬家袋', aliases: ['搬家袋', '编织袋'], category: 'storage', size: s(60, 35, 40), sizeSource: 'estimated', freq: 'rare',
-    flags: { compressible: 0.3 }, preferred: ['bedFoot', 'wardrobeBottom'] },
+    flags: { compressible: 0.3 }, preferred: ['wardrobeBottom', 'pubEntry'] },
   { libId: 'box-l', name: '大号收纳箱', aliases: ['收纳箱', '整理箱'], category: 'storage', size: s(55, 40, 33), sizeSource: 'product', freq: 'monthly',
-    flags: { stackable: true, canBearLoad: true }, preferred: ['underDesk', 'bedFoot'] },
+    flags: { stackable: true, canBearLoad: true }, preferred: ['underDesk', 'wardrobeBottom'] },
   { libId: 'box-m', name: '中号收纳箱', aliases: ['收纳盒', '折叠收纳箱'], category: 'storage', size: s(44, 32, 26), sizeSource: 'product', freq: 'monthly',
     flags: { stackable: true, canBearLoad: true }, preferred: ['underDesk', 'wardrobeBottom'] },
   { libId: 'box-desk', name: '桌面收纳盒', aliases: ['笔筒', '桌面收纳'], category: 'study', size: s(25, 15, 12), sizeSource: 'estimated', freq: 'daily',
@@ -96,10 +96,10 @@ export const LIBRARY = Object.freeze([
   { libId: 'guitar', name: '吉他', aliases: ['尤克里里'], category: 'sport', size: s(40, 12, 105), sizeSource: 'estimated', freq: 'weekly',
     flags: { fragile: true }, preferred: ['pubEntry'] },
   { libId: 'yoga-mat', name: '瑜伽垫', aliases: [], category: 'sport', size: s(12, 12, 62), sizeSource: 'estimated', freq: 'weekly',
-    flags: {}, preferred: ['pubEntry', 'bedFoot'] },
+    flags: {}, preferred: ['pubEntry', 'balcony'] },
   // 以下 6 条来自 assets/reference-notes.md §3（队友整理的"宿舍必备"清单），尺寸为估计值
   { libId: 'bed-basket', name: '床边收纳筐', aliases: ['床边挂篮', '挂篮'], category: 'storage', size: s(30, 12, 15), sizeSource: 'estimated', freq: 'daily',
-    flags: {}, preferred: ['bed', 'hutch'] },
+    flags: {}, preferred: ['hutch', 'desk'] },
   { libId: 'desk-shelf', name: '桌面简易书架', aliases: ['桌面书架', '简易书架'], category: 'study', size: s(35, 20, 25), sizeSource: 'estimated', freq: 'daily',
     flags: { canBearLoad: true }, preferred: ['desk'] },
   { libId: 'noodle-box', name: '泡面盒', aliases: ['泡面', '方便面'], category: 'food', size: s(15, 15, 10), sizeSource: 'estimated', freq: 'weekly',
@@ -108,7 +108,7 @@ export const LIBRARY = Object.freeze([
     flags: { stackable: true, canBearLoad: true }, preferred: ['wardrobeBottom', 'balcony'] },
   { libId: 'sock-dryer', name: '晾衣架（袜夹）', aliases: ['晾衣架', '袜夹'], category: 'toiletry', size: s(35, 25, 5), sizeSource: 'estimated', freq: 'weekly',
     flags: {}, preferred: ['balcony'] },
-  // 床帘挂在床上，不算收纳；按 reference-notes §3.C 归为 decor 放床面
+  // 床帘/蚊帐是明确床设施；保持 decor 契约，由床位硬限制精确白名单放行此 libId。
   { libId: 'bed-curtain', name: '床帘', aliases: ['蚊帐'], category: 'decor', size: s(30, 20, 10), sizeSource: 'estimated', freq: 'daily',
     flags: { stackable: true }, preferred: ['bed'] },
   { libId: 'parcel', name: '快递盒', aliases: ['纸箱', '快递'], category: 'trash', size: s(35, 25, 20), sizeSource: 'estimated', freq: 'rare',

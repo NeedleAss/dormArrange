@@ -1,7 +1,6 @@
 // 危险品回归：导入后的物品必须统一过规则，分类、功率和收纳路径不能绕过安全门。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import {
   buildRoom, checkRules, computeSync, makeItem, parseItemsText,
   planMoveIn, planFocusField, planSeasons, scatterOnDesk, PRESETS
@@ -65,7 +64,7 @@ for (const name of ['打 火 机', '打\u3000火\u3000石', '打\u200b火\u200d�
   });
 }
 
-for (const name of ['LED电子蜡烛（无火）', '打火机保护套', '打火石科普书', '酒精棉片', 'highlighter']) {
+for (const name of ['LED电子蜡烛（无火）', '打火机保护套', '打火石科普书', '烟花爆竹科普书', '酒精棉片', 'highlighter']) {
   test(`安全相似名称：${name} 不误禁`, () => {
     const item = smallItem(name);
     assert.equal(checkRules(item).banned, false);
@@ -303,11 +302,20 @@ test('腾桌不抽走危险品的下层支撑物，学习工具标志也不能�
   assert.deepEqual({ items, placements }, before);
 });
 
-test('原紫荆演示结果的 JSON 哈希保持不变', () => {
+test('新床面政策下原演示仍拒绝危险品，结果确定且新位置通过安全审查', () => {
   const room = buildRoom();
-  const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
-  assert.equal(hash(planMoveIn(room, parseItemsText(PRESETS.freshman))),
-    '7794afb3c0278d0bda506a03530579e49d89e242a918bad7952be8503e754fea');
-  assert.equal(hash(planFocusField(room, PRESETS.messyDesk.items, PRESETS.messyDesk.placements)),
-    '474d5042d22fb888078b06dfd80394cd1fe17bb0c508bee2ec80a17e4a260a9d');
+  const items = parseItemsText(PRESETS.freshman);
+  const report = planMoveIn(room, items);
+  const danger = items.filter((item) => checkRules(item).banned);
+  assert.ok(danger.length > 0);
+  for (const item of danger) {
+    assert.equal(report.verdicts[item.id].status, 'banned');
+    assert.ok(!report.placements[item.id]);
+    assert.ok(report.overflowIds.includes(item.id));
+  }
+  assert.deepEqual(planMoveIn(room, items), report);
+  const focus = planFocusField(room, PRESETS.messyDesk.items, PRESETS.messyDesk.placements);
+  assert.deepEqual(planFocusField(room, PRESETS.messyDesk.items, PRESETS.messyDesk.placements), focus);
+  assert.equal(computeSync(room, PRESETS.messyDesk.items, focus.placementsAfter).parts.safety, 1);
+  assertValidPlacements(room, focus.placementsAfter);
 });

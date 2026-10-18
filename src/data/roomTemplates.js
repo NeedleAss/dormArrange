@@ -89,8 +89,8 @@ const ZONE_ACCEPTS = {
   underDeskBack: ['storage', 'books', 'electronics', 'misc', 'food'],
   wardrobeHang: ['clothes', 'misc'],
   wardrobeBottom: ['clothes', 'storage', 'toiletry', 'appliance', 'misc', 'sport', 'bedding'],
-  bed: ['bedding', 'decor', 'electronics', 'books'],
-  bedFoot: ['storage', 'bedding', 'clothes', 'luggage', 'misc', 'books', 'sport']
+  bed: ['bedding'],
+  bedFoot: ['bedding']
 };
 
 /** 深合并：只覆盖明确传入的校准值，不共享模板的嵌套对象或数组。O(参数字段数)。 */

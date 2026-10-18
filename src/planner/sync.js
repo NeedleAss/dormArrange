@@ -3,6 +3,7 @@
 import { intersects, overlapArea2D, focusRect, intersection } from './geometry.js';
 import { checkRules } from './checkRules.js';
 import { idealTier } from './rank.js';
+import { placementViolation } from './placementPolicy.js';
 
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -20,6 +21,7 @@ export function computeSync(room, items, placements, ctx = {}) {
   const rulesById = new Map(items.map((it) => [it.id, checkRules(it)]));
   const placedBanned = items.filter((it) => placements[it.id] && rulesById.get(it.id).banned)
     .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const bedViolations = items.filter((it) => placements[it.id] && placementViolation(room, it, placements[it.id], placements, items));
   const considered = items.filter((it) => !rulesById.get(it.id).banned && !it.flags?.disposable && it.category !== 'trash');
   const placed = considered.filter((it) => placements[it.id]);
   const unplaced = considered.length - placed.length;
@@ -61,7 +63,7 @@ export function computeSync(room, items, placements, ctx = {}) {
   const kcs = room.zones.filter((z) => z.kind === 'keepClear');
   let blocking = 0;
   for (const p of Object.values(placements)) if (kcs.some((k) => intersects(k.box, p.box))) blocking++;
-  const safety = placedBanned.length ? 0 : blocking === 0 ? 1 : Math.max(0, 1 - 0.5 * blocking);
+  const safety = placedBanned.length || bedViolations.length ? 0 : blocking === 0 ? 1 : Math.max(0, 1 - 0.5 * blocking);
 
   const total = Math.max(0, Math.min(100, Math.round(100 * (0.35 * fit + 0.25 * access + 0.25 * focus + 0.15 * safety))));
   const moves = ctx.moves ?? 0, decisions = ctx.decisions ?? 0, swaps = ctx.swaps ?? 0;
@@ -75,6 +77,7 @@ export function computeSync(room, items, placements, ctx = {}) {
     if (unplaced > 0 && fit < 0.9) notes.push(`空：还有 ${unplaced} 件东西放不下`);
     if (blocking > 0) notes.push(`空：有 ${blocking} 件东西堵住了通道或活动区`);
     for (const it of placedBanned) notes.push(`空：「${it.name}」已放入宿舍但未通过安全检查：${rulesById.get(it.id).reason ?? '请联系宿管确认并安全移出宿舍'}`);
+    for (const it of bedViolations) notes.push(`空：「${it.name}」位置不合法：${placementViolation(room, it, placements[it.id], placements, items)}`);
   }
   if (!votes.mind) {
     if (focus < 0.9) notes.push(`心：专注区里还有 ${inFocus} 件东西`);

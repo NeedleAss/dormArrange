@@ -30,7 +30,7 @@ test('每个月都没有重叠、不越界、不进 keepClear；inside 分区包
   for (const m of plan.months) assertValidPlacements(room, plan.byMonth[m].placements, inz);
 });
 
-test('当月不活跃的季节物品都在 tier 2 或 inside 分区；活跃的都在可达分区', () => {
+test('当月不活跃的季节物品在inside或tier≥1的非挂杆分区；活跃的不用箱内分区', () => {
   let storedCount = 0;
   for (const m of plan.months) {
     const bm = plan.byMonth[m];
@@ -42,7 +42,7 @@ test('当月不活跃的季节物品都在 tier 2 或 inside 分区；活跃的�
         storedCount++;
         assert.ok(bm.stored.includes(it.id), `${m} 月 ${it.name}`);
         const z = zoneById.get(p.zoneId);
-        assert.ok(p.zoneId.endsWith('.inside') || z.tier === 2, `${m} 月 ${it.name} 收在 ${p.zoneId}`);
+        assert.ok(p.zoneId.endsWith('.inside') || (z.tier >= 1 && z.kind !== 'hang'), `${m} 月 ${it.name} 收在 ${p.zoneId}`);
       } else {
         assert.ok(bm.active.includes(it.id));
         assert.ok(!p.zoneId.endsWith('.inside'), `${m} 月 ${it.name} 在用却在箱内`);

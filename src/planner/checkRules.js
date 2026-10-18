@@ -14,6 +14,7 @@ function normalize(value) {
 function subject(value) {
   return value.replace(/\s+/g, '')
     .replace(/(?:打火机|点火石|打火石|电热毯|电饭锅|电磁炉)(?:使用说明书|说明书|科普书|保护套|空收纳盒)/g, '')
+    .replace(/(?:烟花爆竹|烟花|爆竹|炸药)(?:说明书|科普书|安全手册)/g, '')
     .replace(/(?:led(?:电子)?|电子|无火)蜡烛/g, '')
     .replace(/酒精(?:棉片|棉球|湿巾|擦拭片)/g, '');
 }

@@ -7,6 +7,7 @@ import { buildEngines, commitSpot, cloneEngines, itemMap } from './engines.js';
 import { rankZones, hardOk, idealTier, zoneCost } from './rank.js';
 import { computeSync } from './sync.js';
 import { checkRules } from './checkRules.js';
+import { placementViolation, lockedPlacementZone } from './placementPolicy.js';
 import { boxToLocal, focusRect, dist, volume, EPS } from './geometry.js';
 
 const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -64,14 +65,29 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
   const safetyUnresolved = [];
   const fixedIds = new Set();
   const fixedPlacements = [];
+  const bedViolations = new Map();
+  for (const it of items) {
+    const p = placements[it.id];
+    const reason = p && placementViolation(room, it, p, placements, items);
+    if (reason) bedViolations.set(it.id, reason);
+  }
+  // 修复床上箱子时，同时处理其上层物品，不能抽走支撑留下悬空床品。
+  for (const [id] of bedViolations) {
+    for (const it of items) {
+      if (!placements[it.id] || bedViolations.has(it.id) || !restsOn(placements[it.id], placements[id])) continue;
+      bedViolations.set(it.id, '原支撑物须移到床外，上层物品必须先重新安置');
+    }
+  }
   for (const it of [...items].sort((a, b) => byStr(a.id, b.id))) {
     if (!placements[it.id]) continue;
     const rule = checkRules(it);
-    if (!rule.banned) continue;
+    const bedReason = bedViolations.get(it.id);
+    if (!rule.banned && !(bedReason && lockedPlacementZone(placements[it.id], placements, room, lockedZones))) continue;
     fixedIds.add(it.id);
     fixedPlacements.push(placements[it.id]);
-    safetyUnresolved.push({ itemId: it.id, reason: rule.reason ?? '物品未通过宿舍安全检查',
-      suggestion: '停止使用并联系宿管，按要求安全移出宿舍；不要作为普通垃圾丢弃。' });
+    safetyUnresolved.push({ itemId: it.id, reason: rule.banned ? rule.reason : `${bedReason}；原分区已锁定，不能自动挪动`,
+      suggestion: rule.banned ? '停止使用并联系宿管，按要求安全移出宿舍；不要作为普通垃圾丢弃。' :
+        '先手动移除违规床上物品或解锁原分区，再重新规划；不会静默解锁。' });
   }
   // 固定禁物的整条支撑链，避免挪走下层物品后留下悬空的禁物；每对 placement 最多检查一次，O(P²)。
   for (let index = 0; index < fixedPlacements.length; index += 1) {
@@ -86,6 +102,7 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
 
   // ── §5.2 冲突集 ──
   const conflictSet = new Set();
+  for (const id of bedViolations.keys()) conflictSet.add(id);
   const deskLocked = lockedZones.includes(desk.id);
   const onDesk = Object.values(placements).filter((p) => p.zoneId === desk.id && byId[p.itemId]).sort((a, b) => byStr(a.itemId, b.itemId));
   {
@@ -123,9 +140,8 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
 
   // ── §5.3 逐件找落点 ──
   const cur = structuredClone(placements);
-  const rest = {};
-  for (const [id, p] of Object.entries(placements)) if (!conflictSet.has(id) || fixedIds.has(id)) rest[id] = p;
-  let engines = buildEngines(room, rest, { lockedZones, items });
+  // 未执行的物品仍占据现实位置；逐步移走当前物品，避免中间步骤相互穿插。
+  let engines = buildEngines(room, placements, { lockedZones, items });
   engines[desk.id].blockRect(rect);
   const syncBefore = computeSync(room, items, placements, { owner, focusBox }).total;
 
@@ -145,7 +161,8 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
     const fromPl = cur[c.id];
     const fromLocal = boxToLocal(desk, fromPl.box);
     const origin = { u: fromLocal.u0 + fromLocal.a / 2, v: fromLocal.v0 + fromLocal.b / 2 };
-    const zs = [...near, ...room.zones.filter((z) => z.owner === 'pub')];
+    const zs = bedViolations.has(c.id) ? rankZones(c, room, ctx).map((r) => r.zone) :
+      [...near, ...room.zones.filter((z) => z.owner === 'pub')];
     let best = null;
     for (const z of zs) {
       const isPub = z.owner === 'pub';
@@ -156,6 +173,12 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
         : e.findSpot(c, z.id === desk.id ? { mode: 'near', origin } : { mode: 'store' });
       if (!spot) continue;
       const toBox = e.kind === 'rail' ? e.boxFor(spot) : boxFromSpot(z, spot);
+      const target = { zoneId: z.id, box: toBox };
+      if (placementViolation(room, c, target, cur, byId) || lockedPlacementZone(target, cur, room, lockedZones)) continue;
+      if ([...bedViolations.keys()].some((id) => id !== c.id && cur[id] &&
+          Math.abs(toBox.y - cur[id].box.y - cur[id].box.h) < EPS &&
+          Math.min(toBox.x + toBox.w, cur[id].box.x + cur[id].box.w) > Math.max(toBox.x, cur[id].box.x) + EPS &&
+          Math.min(toBox.z + toBox.d, cur[id].box.z + cur[id].box.d) > Math.max(toBox.z, cur[id].box.z) + EPS)) continue;
       // rankZonesForMove 的三点调整只用于同分代价时的先后：桌面 −2、同主人近处 −1、公共 +5
       const rk = zoneCost(c, z) + (z.id === desk.id ? -2 : nearIds.has(z.id) ? -1 : 0) + (isPub ? 5 : 0);
       const cost = moveCost(c, fromPl, z, toBox);
@@ -176,6 +199,21 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
     placement: toPl ? structuredClone(toPl) : undefined
   });
 
+  /** 箱内后代尚未移出时，容器不能单独移动；兼容历史 .inside 和显式 parentItemId，O(P × 祖先层数)。 */
+  const hasInsideContents = (containerId) => Object.values(cur).some((p) => {
+    const seen = new Set();
+    let current = p;
+    while (current) {
+      const parentId = zoneById.get(current.zoneId)?.parentItemId ??
+        (current.zoneId.endsWith('.inside') ? current.zoneId.slice(0, -7) : null);
+      if (!parentId || seen.has(parentId)) return false;
+      if (parentId === containerId) return true;
+      seen.add(parentId);
+      current = cur[parentId];
+    }
+    return false;
+  });
+
   /** §5.4 一层级联：在 near 里赶走一件不常用的东西到深层分区，再为 c 找落点 */
   const tryCascade = (c) => {
     const evictables = [];
@@ -186,8 +224,8 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
         const x = byId[pe.itemId];
         if (!x || fixedIds.has(x.id) || conflictSet.has(x.id) || moved.has(x.id) || !cur[x.id]) continue;
         const px = cur[x.id];
-        // 上面压着东西的不能直接抽走
-        if (Object.values(cur).some((q) => q.itemId !== x.id && restsOn(q, px))) continue;
+        // 上面或箱内还有物品时不能直接抽走，级联也不能遗留原坐标中的箱内物品。
+        if (hasInsideContents(x.id) || Object.values(cur).some((q) => q.itemId !== x.id && restsOn(q, px))) continue;
         evictables.push(x);
       }
     }
@@ -199,6 +237,8 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
         if (!de) continue;
         const s2 = de.kind === 'rail' ? de.findSpot(x) : de.findSpot(x, { mode: 'store' });
         if (!s2) continue;
+        const target = { zoneId: dz.id, box: de.kind === 'rail' ? de.boxFor(s2) : boxFromSpot(dz, s2) };
+        if (placementViolation(room, x, target, cur, byId) || lockedPlacementZone(target, cur, room, lockedZones)) continue;
         const backup = cloneEngines(engines);
         const fromX = cur[x.id];
         engines[fromX.zoneId].removeItem(x.id);
@@ -215,10 +255,17 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
   };
 
   const order = conflicts.filter((id) => !fixedIds.has(id)).map((id) => byId[id]).sort((a, b) =>
-    (cur[b.id].layer ?? 0) - (cur[a.id].layer ?? 0) || volume(b.size) - volume(a.size) || byStr(a.id, b.id));
+    Number(cur[b.id].zoneId.endsWith('.inside')) - Number(cur[a.id].zoneId.endsWith('.inside')) ||
+    cur[b.id].box.y - cur[a.id].box.y || (cur[b.id].layer ?? 0) - (cur[a.id].layer ?? 0) || volume(b.size) - volume(a.size) || byStr(a.id, b.id));
   for (const c of order) {
     const fromPl = cur[c.id];
-    if (c.flags?.disposable || c.category === 'trash') {
+    if (hasInsideContents(c.id) || Object.values(cur).some((q) => q.itemId !== c.id && restsOn(q, fromPl))) {
+      unresolved.push({ itemId: c.id, reason: '上方或箱内物品尚未得到合法安置，不能自动抽走支撑或移动容器',
+        suggestion: '先安置上方/箱内物品，再重新规划；床面和床尾不作普通收纳兜底' });
+      continue;
+    }
+    engines[fromPl.zoneId]?.removeItem(c.id);
+    if ((c.flags?.disposable || c.category === 'trash') && !bedViolations.has(c.id)) {
       groups.push([makeStep(c, 'dispose', fromPl, null)]);
       delete cur[c.id];
       moved.add(c.id);
@@ -250,8 +297,9 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
       cur[c.id] = toPl; moved.add(c.id);
       continue;
     }
-    unresolved.push({ itemId: c.id, reason: '附近放不下',
-      suggestion: c.flags?.compressible ? '真空压缩后收进床尾' : '收进床尾或带回家；也可以加购桌面置物架' });
+    engines[fromPl.zoneId]?.commitFromWorld(c, fromPl);
+    unresolved.push({ itemId: c.id, reason: bedViolations.get(c.id) ?? '附近合法床外空间放不下',
+      suggestion: c.flags?.compressible ? '压缩后放入合法床外收纳区，仍放不下时带回家或寄存' : '床面和床尾不作普通收纳；带回家、寄存或增加床外容量' });
   }
 
   // ── §5.5 步骤与文案 ──
