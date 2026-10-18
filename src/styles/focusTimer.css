@@ -1,0 +1,22 @@
+.focus-limit{position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;padding:24px;border:12px solid var(--orange);border-image:repeating-linear-gradient(-45deg,var(--orange) 0 10px,#000 10px 20px) 12;color:var(--white);background:rgba(5,5,6,.78);overflow:auto;z-index:120;outline:none}
+.focus-limit[open]{display:grid;place-items:center}
+.focus-limit::backdrop{background:rgba(0,0,0,.22)}
+.focus-limit-content{width:100%;max-width:1400px;text-align:center}
+.focus-limit-kicker{font:600 12px var(--font-label);letter-spacing:.24em;color:var(--muted)}
+.focus-limit h2{font:900 clamp(22px,4vw,50px)/1.3 var(--font-display);color:var(--amber);transform:scaleY(1.18);letter-spacing:-.04em;margin:28px 0 10px}
+.focus-limit h2 span{display:block;font:700 16px var(--font-label);letter-spacing:.24em;margin-bottom:13px}
+.focus-limit-digits{display:block;color:var(--amber);font:400 clamp(76px,18vw,270px)/1.2 var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.05em;white-space:nowrap}
+.focus-limit-progress{min-height:24px;font:13px var(--font-mono);color:var(--muted);margin:10px 0 28px}
+.focus-limit-controls{display:flex;align-items:center;justify-content:center;gap:32px;flex-wrap:wrap}
+.focus-limit-stop{min-width:150px;border-color:var(--red);color:var(--red);padding:13px 28px}
+.focus-limit-stop span{font:11px var(--font-mono);margin-left:15px;opacity:.6}
+.focus-limit-stop:hover{background:var(--red);color:var(--white)}
+.focus-limit-speed{display:flex;align-items:center;gap:8px;color:var(--amber);font:600 16px var(--font-label);cursor:pointer}
+.focus-limit-speed input{width:17px;height:17px;margin:0;accent-color:var(--orange)}
+.focus-limit-speed small{font:11px var(--font-body);color:var(--muted);margin-left:3px}
+.focus-limit-note{font-size:11px;color:var(--muted);margin-top:24px}
+.focus-limit-demo .focus-limit-progress{color:var(--cyan)}
+.focus-limit-final .focus-limit-digits{color:var(--red);animation:focus-limit-pulse 1s steps(2,end) infinite}
+@keyframes focus-limit-pulse{50%{opacity:.3}}
+@media(max-width:620px){.focus-limit{padding:18px}.focus-limit-kicker{font-size:10px;letter-spacing:.12em}.focus-limit-controls{gap:20px}.focus-limit-speed{flex-wrap:wrap;justify-content:center}.focus-limit-speed small{width:100%}.focus-limit h2{margin-top:22px}}
+@media(prefers-reduced-motion:reduce){.focus-limit-final .focus-limit-digits{animation:none}}

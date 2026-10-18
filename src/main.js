@@ -12,6 +12,9 @@ import { boot } from './ui/boot.js';
 import { showTitleCard } from './ui/titleCard.js';
 import * as modelPanel from './ui/panels/ep00Model.js';
 import * as moveInPanel from './ui/panels/ep01MoveIn.js';
+import * as focusPanel from './ui/panels/ep02Focus.js';
+import { mountMonitor } from './ui/widgets/monitor.js';
+import { createFocusTimer } from './ui/widgets/focusTimer.js';
 
 // glob 只收集已存在的公开入口，缺席车道不会触发浏览器 404 或构建失败。
 const loaders = import.meta.glob(['./planner/index.js', './scene/index.js', './ai/index.js']);
@@ -34,6 +37,8 @@ bindScene(store, scene);
 const ai = await load('./ai/index.js');
 if (ai?.aiAvailable) ai.aiAvailable().then(available => store.set({ ai: { ...store.get().ai, available } })).catch(() => {});
 const ctx = { store, scene, planner, ai, alert, footer: shell.footer, showTitleCard };
+const focusTimer = createFocusTimer(ctx);
+ctx.startFocus = focusTimer.start;
 let navigating = false;
 async function navigate(id) {
   if (navigating || id === store.get().episode) return;
@@ -44,7 +49,7 @@ async function navigate(id) {
   navigating = false;
 }
 let activePanel = null;
-const panels = { EP00: modelPanel, EP01: moveInPanel };
+const panels = { EP00: modelPanel, EP01: moveInPanel, EP02: focusPanel };
 function render() {
   activePanel?.unmount();
   const ep = EPISODES.find(e => e.id === store.get().episode);
@@ -59,7 +64,7 @@ document.addEventListener('keydown', event => {
   if (/^[0-4]$/.test(event.key)) navigate(`EP0${event.key}`);
 });
 store.subscribe(render, ['episode']); render();
-shell.monitor.innerHTML = '<section class="panel"><div class="panel-head">SYNC RATIO <b>同步率</b></div><div class="panel-body"><span class="mono" style="font-size:64px;color:var(--muted)">—</span><p class="hint">完成规划后，生成真实空间评估。</p></div></section><section class="panel"><div class="panel-head">TRIBUNAL <b>三审决议</b></div><div class="panel-body muted">时 / 空 / 心 · 等待首次规划</div></section>';
+mountMonitor(shell.monitor, ctx);
 alert(planner ? '宿舍模板已载入，尺寸单位 cm。' : '规划模块加载中。');
 await boot({ planner, scene, ai });
 }
