@@ -141,13 +141,15 @@ export function planMoveIn(room, items, opts = {}) {
     }
     if (r.warn) warn[it.id] = r.warn;
     if (it.category === 'trash' || it.flags?.disposable) {
-      verdicts[it.id] = { status: 'relocate', zoneId: undefined, reasons: ['可丢弃物品'], suggestions: ['直接扔掉或拆平'] };
+      // 已在 existing 里的（例如锁定分区里的快递盒）保留原位，只给扔掉的建议
+      verdicts[it.id] = { status: 'relocate', zoneId: existing[it.id]?.zoneId, reasons: ['可丢弃物品'], suggestions: ['直接扔掉或拆平'] };
     }
   }
 
-  // 已有 placement 的物品保持原位
+  // 已有 placement 的物品保持原位（可丢弃物品也一样，是否扔掉由用户决定）
   for (const it of sorted) {
-    if (!verdicts[it.id] && existing[it.id]) placements[it.id] = structuredClone(existing[it.id]);
+    if (!existing[it.id]) continue;
+    if (!verdicts[it.id] || verdicts[it.id].status === 'relocate') placements[it.id] = structuredClone(existing[it.id]);
   }
 
   // ② 排序（难放的先放）：可行分区数升序、最长边降序、体积降序、id

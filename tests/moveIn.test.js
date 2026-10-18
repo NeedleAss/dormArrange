@@ -121,3 +121,20 @@ test('性能：40 件 ≤ 150ms，随机物品也满足不变量', () => {
   const s = r.summary;
   assert.equal(s.fits + s.relocate + s.uncertain + s.overflow + s.banned, 40);
 });
+
+test('existing 里的可丢弃物品保留原位：verdict 为 relocate，建议扔掉，zoneId 为所在分区', () => {
+  const parcel = makeItem('parcel', { id: 'px' });
+  const box = { x: 0, y: 130, z: 260, w: 25, d: 35, h: 20 };   // A.hutch 里的一个快递盒
+  const existing = { px: { itemId: 'px', zoneId: 'A.hutch', box, rot: 90, lying: false, layer: 0, compressed: false } };
+  const r = planMoveIn(room, [parcel, makeItem('books-10', { id: 'bk' })], { existing, lockedZones: ['A.hutch'] });
+  assert.deepEqual(r.placements.px, existing.px);
+  assert.equal(r.verdicts.px.status, 'relocate');
+  assert.equal(r.verdicts.px.zoneId, 'A.hutch');
+  assert.deepEqual(r.verdicts.px.suggestions, ['直接扔掉或拆平']);
+  assert.ok(!r.overflowIds.includes('px'));
+  assertValidPlacements(room, r.placements);
+  // 不在 existing 里的可丢弃物品仍然没有位置
+  const r2 = planMoveIn(room, [makeItem('parcel', { id: 'py' })]);
+  assert.equal(r2.placements.py, undefined);
+  assert.equal(r2.verdicts.py.zoneId, undefined);
+});
