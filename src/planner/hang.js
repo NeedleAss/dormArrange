@@ -59,6 +59,17 @@ export class HangRail {
     return { x: b.x + (b.w - ww) / 2, y, z: this.start + spot.offset, w: ww, d: spot.thickness, h: spot.length };
   }
 
+  /** 原位放回：offset 区间仍空闲时返回 spot */
+  tryAt(item, offset) {
+    if (this.locked || !this.canHang(item)) return null;
+    const t = item.hang.thickness;
+    if (offset < -EPS || offset + t > this.L + EPS) return null;
+    for (const e of this.placed) {
+      if (Math.min(offset + t, e.offset + e.thickness) - Math.max(offset, e.offset) > EPS) return null;
+    }
+    return { offset, thickness: t, length: item.hang.length, base: 0 };
+  }
+
   commit(item, spot, pl) {
     this.placed.push({ itemId: item.id, offset: spot.offset, thickness: spot.thickness, length: spot.length, pl });
     return { box: this.boxFor(spot), layer: 0 };

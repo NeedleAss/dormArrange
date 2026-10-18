@@ -10,7 +10,8 @@ const freshman = '24寸行李箱，28寸行李箱，冬被，夏凉被，枕头�
 export const PRESETS = {
   freshman,
   messyDesk: buildMessyDesk(),
-  // B4 时补齐：4 个 Snapshot
+  // 4 个 Snapshot 需要规划器计算，由 src/planner/growth.js 构建、在 planner/index.js 合并进对外的 PRESETS。
+  // 请从 planner/index.js 取 PRESETS.growth；这里只是占位。
   growth: []
 };
 

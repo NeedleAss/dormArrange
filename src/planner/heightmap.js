@@ -115,6 +115,37 @@ export class Heightmap {
     return spot;
   }
 
+  /**
+   * 检查能否原样放回某个局部矩形（EP03"先试原位"）：格子未封锁、脚下最高点恰好等于原 base、支撑与承重满足。
+   * @param {{u0:number,v0:number,a:number,b:number,base:number,h:number}} l
+   * @returns {any} 可直接 commit 的 spot，或 null
+   */
+  tryAt(item, l, lying = false) {
+    if (this.locked) return null;
+    const { nu, r, top, bear, block } = this;
+    if (l.u0 < -EPS || l.v0 < -EPS || l.u0 + l.a > this.U + EPS || l.v0 + l.b > this.V + EPS) return null;
+    if (l.base + l.h > this.zone.box.h + EPS) return null;
+    const [i0, i1] = cellRange(l.u0, l.a, r, nu);
+    const [j0, j1] = cellRange(l.v0, l.b, r, this.nv);
+    let maxTop = 0;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const c = j * nu + i;
+      if (block[c]) return null;
+      if (top[c] > maxTop) maxTop = top[c];
+    }
+    if (Math.abs(maxTop - l.base) > EPS) return null;
+    if (l.base > EPS) {
+      if (!this.zone.stackable) return null;
+      let sup = 0, n = 0;
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const c = j * nu + i; n++;
+        if (top[c] >= l.base - 1) { sup++; if (!bear[c]) return null; }
+      }
+      if (sup / n < 0.6) return null;
+    }
+    return { u0: l.u0, v0: l.v0, a: l.a, b: l.b, h: l.h, base: l.base, lying };
+  }
+
   /** 支撑格里最上层物品的 layer + 1；直接放在底面为 0 */
   _layerAt(u0, v0, a, b, base) {
     if (base <= EPS) return 0;

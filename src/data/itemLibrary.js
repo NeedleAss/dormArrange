@@ -33,7 +33,8 @@ export const LIBRARY = Object.freeze([
   { libId: 'down-jacket', name: '羽绒服', aliases: ['棉服', '棉衣'], category: 'clothes', size: s(40, 30, 25), sizeSource: 'estimated', freq: 'seasonal', months: [11, 12, 1, 2, 3],
     flags: { hangable: true, compressible: 0.4 }, hang: { thickness: 10, length: 90 }, preferred: ['wardrobeHang'] },
   { libId: 'coat', name: '外套', aliases: ['夹克', '卫衣', '风衣'], category: 'clothes', size: s(35, 28, 12), sizeSource: 'estimated', freq: 'weekly', months: [9, 10, 11, 3, 4, 5],
-    flags: { hangable: true }, hang: { thickness: 6, length: 80 }, preferred: ['wardrobeHang'] },
+    // 叠起来的外套可以再压一件（换季收起时叠放），所以 stackable / canBearLoad 为 true
+    flags: { hangable: true, stackable: true, canBearLoad: true }, hang: { thickness: 6, length: 80 }, preferred: ['wardrobeHang'] },
   { libId: 'clothes-stack', name: '衣物（一叠 10 件）', aliases: ['衣服', 'T恤', 't恤', '衬衫', '裤子'], category: 'clothes', size: s(30, 25, 20), sizeSource: 'estimated', freq: 'daily',
     flags: { stackable: true, canBearLoad: true }, preferred: ['wardrobeBottom'] },
   { libId: 'shoes', name: '鞋（一双）', aliases: ['运动鞋', '鞋子', '拖鞋', '鞋'], category: 'clothes', size: s(32, 20, 12), sizeSource: 'estimated', freq: 'daily',
@@ -57,7 +58,8 @@ export const LIBRARY = Object.freeze([
   { libId: 'headphones', name: '耳机', aliases: ['耳机盒'], category: 'electronics', size: s(20, 18, 9), sizeSource: 'estimated', freq: 'daily',
     flags: {}, preferred: ['hutch', 'desk'] },
   { libId: 'fan-desk', name: '台式小风扇', aliases: ['风扇', '电扇', '小风扇'], category: 'appliance', size: s(25, 20, 35), sizeSource: 'estimated', freq: 'seasonal', months: [6, 7, 8, 9],
-    flags: {}, powerW: 30, preferred: ['desk', 'hutch'] },
+    // 收起时可以侧放进行李箱（canLieDown）
+    flags: { canLieDown: true }, powerW: 30, preferred: ['desk', 'hutch'] },
   { libId: 'hairdryer', name: '吹风机', aliases: ['电吹风'], category: 'appliance', size: s(25, 10, 25), sizeSource: 'estimated', freq: 'weekly',
     flags: {}, powerW: null, preferred: ['wardrobeBottom', 'balcony'], note: '需确认额定功率 ≤ 1000W' },
   { libId: 'kettle', name: '电热水壶', aliases: ['烧水壶', '热水壶', '电水壶'], category: 'appliance', size: s(22, 16, 25), sizeSource: 'estimated', freq: 'daily',

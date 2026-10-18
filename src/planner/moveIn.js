@@ -3,7 +3,7 @@
 // 放不下且可压缩时按压缩尺寸重试。然后做五分类、尺寸容差 / need 和中文建议。
 // 复杂度 O(物品数 × 分区数 × findSpot)。40 件约几十毫秒。
 
-import { buildEngines, commitSpot, compressedSize, zoneFill, itemMap } from './engines.js';
+import { buildEngines, commitSpot, compressedItem, zoneFill } from './engines.js';
 import { rankZones, idealTier } from './rank.js';
 import { LIBRARY_BY_ID } from '../data/itemLibrary.js';
 import { checkRules } from './checkRules.js';
@@ -41,9 +41,8 @@ export function placeWithCompression(item, room, engines, ctx) {
   const ranked = rankZones(item, room, { ...ctx, fillOf });
   let res = placeFirstFit(item, ranked, engines);
   if (!res) {
-    const cs = compressedSize(item);
-    if (cs) {
-      const itC = { ...item, size: cs };
+    const itC = compressedItem(item);
+    if (itC) {
       res = placeFirstFit(itC, rankZones(itC, room, { ...ctx, fillOf }), engines, { compressed: true });
       if (res) res.item = itC;
     }

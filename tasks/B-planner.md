@@ -85,13 +85,13 @@
 
 ## B4 同步率 + 第三话 时分复用（20 分钟）
 
-- [ ] `computeSync`：实现 docs/05 §7，包括三审决议 votes 和中文 notes。
-- [ ] `planSeasons`：实现 docs/05 §6。
+- [x] `computeSync`：实现 docs/05 §7，包括三审决议 votes 和中文 notes。
+- [x] `planSeasons`：实现 docs/05 §6。
   - 12 个月逐月放置；inside 分区（行李箱内部）作为深层收纳
   - 每件物品优先放回上个月的位置，保证月与月之间稳定
   - 输出 matrix；`compare: true` 时同时算 tdm 关闭的结果做对比
-- [ ] `diffMonths(monthPlanA, monthPlanB, items, room)`：输出换季步骤和文案。
-- [ ] `tests/seasons.test.js`，断言：
+- [x] `diffMonths(monthPlanA, monthPlanB, items, room)`：输出换季步骤和文案。
+- [x] `tests/seasons.test.js`，断言：
   - 每个月都没有重叠
   - 当月不活跃的季节物品都在 tier 2 或 inside 分区
   - `compare.on.maxFill <= compare.off.maxFill`
@@ -99,11 +99,11 @@
 ## B5 文本解析 + 演示预设（15 分钟）
 
 - [x] `parseItemsText`：实现 docs/05 §8，支持中文数字、数量词、"寸"、"长×宽×高"、功率（W/瓦）；匹配不到物品库的物品，sizeSource 设为 `'unknown'`。
-- [ ] `src/data/demoPresets.js` 导出 `PRESETS`（具体见 docs/07 §4）：
+- [x] `src/data/demoPresets.js` 导出 `PRESETS`（具体见 docs/07 §4）：
   - [x] `freshman`：新生清单的文本
   - [x] `messyDesk`：老生乱桌，包含 items 和 placements，用 `buildRoom()` 的 A.desk 等分区
-  - `growth`：4 个快照
-- [ ] 队友收集到真实清单后，替换掉示例数据，但要保持各测试的断言仍然成立。
+  - [x] `growth`：4 个快照
+- [x] 队友收集到真实清单后，替换掉示例数据，但要保持各测试的断言仍然成立。
 - [x] `tests/parse.test.js`：输入 `"24寸行李箱，两床被子，27寸显示器，书20本，1500W电热水壶"`，断言：
   - 解析出 7 个物品：1 箱 + 2 被 + 1 显示器 + 2 摞书 + 1 水壶
   - 水壶的 `powerW === 1500`
@@ -112,4 +112,4 @@
 
 - [ ] `allowUpgrades: true`：生成"增高架 / 桌面置物架 / 侧边挂钩"三种虚拟分区，输出 alternatives，例如"多花 ¥39，少挪 2 步"（docs/05 §5.7）。
 - [ ] `predictGrowth(items, room, semesters)`：书架溢出预测（docs/05 §9）。
-- [ ] `scatterOnDesk(room, items, { owner })`：乱桌生成器（docs/05 §5.8），用于观众互动"说出你桌上的东西 → 现场腾桌"。
+- [x] `scatterOnDesk(room, items, { owner })`：乱桌生成器（docs/05 §5.8），用于观众互动"说出你桌上的东西 → 现场腾桌"。

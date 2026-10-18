@@ -82,6 +82,15 @@ export function roundBox(b) {
   return { x: r(b.x), y: r(b.y), z: r(b.z), w: r(b.w), d: r(b.d), h: r(b.h) };
 }
 
+/**
+ * 压缩后的物品：高度乘以 compressible；真空压缩袋压成扁平的一块，可以侧立（canLieDown = true）。
+ * 不可压缩时返回 null。
+ */
+export function compressedItem(item) {
+  const cs = compressedSize(item);
+  return cs ? { ...item, size: cs, flags: { ...item.flags, canLieDown: true } } : null;
+}
+
 /** 压缩后的尺寸：高度乘以 compressible */
 export function compressedSize(item) {
   const k = item.flags?.compressible;
