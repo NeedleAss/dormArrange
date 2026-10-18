@@ -33,7 +33,7 @@
   - 与物品库合并：能匹配到 `LIBRARY` 的用库里的尺寸，sizeSource 设为 `'product'`；AI 估计的尺寸设为 `'estimated'`
   - 失败或超时：自动回退到 `parseItemsText(text, { owner })`，`source = 'rules'`，并在 `warnings` 里写明原因
   - 返回 `{ items, source, warnings }`
-- [ ] UI 只显示"AI 离线，已使用本地解析"，不把技术错误暴露给观众。
+- [x] UI 只显示"AI 离线，已使用本地解析"，不把技术错误暴露给观众。
 
 ## D3 照片导入（加分）
 
