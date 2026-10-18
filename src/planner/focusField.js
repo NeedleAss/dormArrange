@@ -6,6 +6,7 @@
 import { buildEngines, commitSpot, cloneEngines, itemMap } from './engines.js';
 import { rankZones, hardOk, idealTier, zoneCost } from './rank.js';
 import { computeSync } from './sync.js';
+import { checkRules } from './checkRules.js';
 import { boxToLocal, focusRect, dist, volume, EPS } from './geometry.js';
 
 const byStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -59,13 +60,37 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
   const zoneById = new Map(room.zones.map((z) => [z.id, z]));
   const { rect, box: focusBox } = focusRect(desk, spec.w ?? 75, spec.d ?? 35);
 
+  // 已摆入的禁物必须保留为待处理证据，不能被腾桌转换成普通收纳或垃圾处理步骤。
+  const safetyUnresolved = [];
+  const fixedIds = new Set();
+  const fixedPlacements = [];
+  for (const it of [...items].sort((a, b) => byStr(a.id, b.id))) {
+    if (!placements[it.id]) continue;
+    const rule = checkRules(it);
+    if (!rule.banned) continue;
+    fixedIds.add(it.id);
+    fixedPlacements.push(placements[it.id]);
+    safetyUnresolved.push({ itemId: it.id, reason: rule.reason ?? '物品未通过宿舍安全检查',
+      suggestion: '停止使用并联系宿管，按要求安全移出宿舍；不要作为普通垃圾丢弃。' });
+  }
+  // 固定禁物的整条支撑链，避免挪走下层物品后留下悬空的禁物；每对 placement 最多检查一次，O(P²)。
+  for (let index = 0; index < fixedPlacements.length; index += 1) {
+    for (const p of Object.values(placements)) {
+      if (fixedIds.has(p.itemId) || !byId[p.itemId] || !restsOn(fixedPlacements[index], p)) continue;
+      fixedIds.add(p.itemId);
+      fixedPlacements.push(p);
+      safetyUnresolved.push({ itemId: p.itemId, reason: '上方有未通过安全检查的物品，不能自动抽走支撑物',
+        suggestion: '先联系宿管处理上方物品，再重新生成腾桌方案。' });
+    }
+  }
+
   // ── §5.2 冲突集 ──
   const conflictSet = new Set();
   const deskLocked = lockedZones.includes(desk.id);
   const onDesk = Object.values(placements).filter((p) => p.zoneId === desk.id && byId[p.itemId]).sort((a, b) => byStr(a.itemId, b.itemId));
   {
     for (const p of onDesk) {
-      if (byId[p.itemId].flags?.focusTool) continue;
+      if (byId[p.itemId].flags?.focusTool && !fixedIds.has(p.itemId)) continue;
       const l = boxToLocal(desk, p.box);
       if (rectOverlap(l, rect) > 1) conflictSet.add(p.itemId);
     }
@@ -89,7 +114,8 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
       focusBox,
       conflicts,
       steps: [],
-      unresolved: conflicts.map((id) => ({ itemId: id, reason: '书桌已锁定', suggestion: '解锁书桌后再腾桌' })),
+      unresolved: [...safetyUnresolved, ...conflicts.filter((id) => !fixedIds.has(id))
+        .map((id) => ({ itemId: id, reason: '书桌已锁定', suggestion: '解锁书桌后再腾桌' }))],
       placementsAfter: structuredClone(placements),
       metrics: { moves: 0, distanceCm: 0, estSeconds: 0, clearedArea: 0, syncBefore: sync, syncAfter: sync }
     };
@@ -98,7 +124,7 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
   // ── §5.3 逐件找落点 ──
   const cur = structuredClone(placements);
   const rest = {};
-  for (const [id, p] of Object.entries(placements)) if (!conflictSet.has(id)) rest[id] = p;
+  for (const [id, p] of Object.entries(placements)) if (!conflictSet.has(id) || fixedIds.has(id)) rest[id] = p;
   let engines = buildEngines(room, rest, { lockedZones, items });
   engines[desk.id].blockRect(rect);
   const syncBefore = computeSync(room, items, placements, { owner, focusBox }).total;
@@ -108,7 +134,7 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
   const nearIds = new Set(near.map((z) => z.id));
   const moved = new Set();
   const groups = [];          // 每组是一件冲突物品产生的步骤（级联在前），便于保持顺序
-  const unresolved = [];
+  const unresolved = [...safetyUnresolved];
 
   /**
    * 为冲突物品 c 在候选分区里找最优落点（不提交）。
@@ -158,7 +184,7 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
       if (!e || e.locked) continue;
       for (const pe of e.placed) {
         const x = byId[pe.itemId];
-        if (!x || conflictSet.has(x.id) || moved.has(x.id) || !cur[x.id]) continue;
+        if (!x || fixedIds.has(x.id) || conflictSet.has(x.id) || moved.has(x.id) || !cur[x.id]) continue;
         const px = cur[x.id];
         // 上面压着东西的不能直接抽走
         if (Object.values(cur).some((q) => q.itemId !== x.id && restsOn(q, px))) continue;
@@ -188,7 +214,7 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
     return null;
   };
 
-  const order = conflicts.map((id) => byId[id]).sort((a, b) =>
+  const order = conflicts.filter((id) => !fixedIds.has(id)).map((id) => byId[id]).sort((a, b) =>
     (cur[b.id].layer ?? 0) - (cur[a.id].layer ?? 0) || volume(b.size) - volume(a.size) || byStr(a.id, b.id));
   for (const c of order) {
     const fromPl = cur[c.id];
@@ -248,6 +274,8 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
   const distanceCm = r1(steps.reduce((s, st) => s + st.distance, 0));
   const estSeconds = Math.round(steps.reduce((s, st) => s + 15 + 0.3 * st.distance, 0));
   const syncAfter = computeSync(room, items, cur, { owner, focusBox, moves: steps.length }).total;
+  // 安全禁物或其支撑链仍占据力场时，不能把整块力场面积计作已腾空。
+  const safetyConflict = conflicts.some((id) => fixedIds.has(id));
   return {
     focusZoneId: desk.id,
     focusBox,
@@ -255,7 +283,7 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
     steps,
     unresolved,
     placementsAfter: cur,
-    metrics: { moves: steps.length, distanceCm, estSeconds, clearedArea: r1(rect.a * rect.b), syncBefore, syncAfter }
+    metrics: { moves: steps.length, distanceCm, estSeconds, clearedArea: safetyConflict ? 0 : r1(rect.a * rect.b), syncBefore, syncAfter }
   };
 }
 

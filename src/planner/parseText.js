@@ -3,6 +3,7 @@
 // 复杂度 O(片段数 × 物品库别名数)。
 
 import { LIBRARY, LIBRARY_BY_ID, makeItem, rangeFor, DEFAULT_FLAGS } from '../data/itemLibrary.js';
+import { checkRules } from './checkRules.js';
 
 /** 每个类别的"中号"默认尺寸（未匹配物品用） */
 export const CATEGORY_DEFAULT_SIZE = Object.freeze({
@@ -122,6 +123,8 @@ export function parseItemsText(text, opts = {}) {
 
   for (const frag of frags) {
     const lower = frag.toLowerCase();
+    // 明确不携带的分句不生成物品；其他分句仍独立提取，不能借否定词删除真正携带的危险品。
+    if (/^(?:不带|不携带|不准备带|不用带|没有|不要带|无需带)/.test(lower)) continue;
     // 数量
     let qty = 1, qtyText = '', qtyUnit = '';
     let m;
@@ -138,6 +141,9 @@ export function parseItemsText(text, opts = {}) {
 
     // 物品库匹配；有"寸"时在同一规格族里取最接近的一档
     let lib = matchLib(lower);
+    // 配件/说明书不能误匹配为其描述的禁用实体，同时保留名称供后续安全规则检查。
+    if (lib && /保护套|说明书|科普书/.test(lower) && !checkRules({ name: frag }).banned &&
+        checkRules({ name: lib.name, libId: lib.libId }).banned) lib = null;
     let inchExact = true;
     if (inch != null) {
       const fam = (lib && FAMILIES.find((f) => lib.libId.startsWith(f.prefix))) ||

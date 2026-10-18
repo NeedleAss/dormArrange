@@ -119,6 +119,7 @@
  * @property {string[]} [preferred]       首选 slot
  * @property {number} [growthPerSemester]
  * @property {string} [note]
+ * @property {{ status:'blocked'|'review'|'clear', reason:string }} [safety] AI 安全预检；clear不能撤销本地规则，review暂不安排位置
  */
 
 // ───────────────────────── 放置（docs/04 §5） ─────────────────────────

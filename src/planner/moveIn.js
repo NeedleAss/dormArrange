@@ -134,7 +134,10 @@ export function planMoveIn(room, items, opts = {}) {
   for (const it of sorted) {
     const r = checkRules(it);
     if (r.banned) {
-      const sug = [`宿舍禁用：${r.reason}`];
+      const riskReview = r.ruleId === 'R-SAFETY-REVIEW';
+      const safetyRule = /^(R-FIRE|R-FUEL|R-EXPLOSIVE|R-HAZMAT|R-WEAPON|R-AI-SAFETY)$/.test(r.ruleId);
+      const sug = [`${riskReview ? '安全待核实' : safetyRule ? '安全拦截' : '宿舍禁用'}：${r.reason}`];
+      if (riskReview || safetyRule) sug.push('核实前不带入宿舍；向宿管确认安全要求，不在宿舍自行处置危险物');
       if (r.ruleId === 'R-POWER') sug.push('换额定功率 ≤ 1000W 的型号');
       verdicts[it.id] = { status: 'banned', zoneId: undefined, reasons: [r.reason], suggestions: sug };
       continue;

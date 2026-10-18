@@ -5,6 +5,7 @@
 import { buildEngines, commitSpot } from './engines.js';
 import { localExtents, volume } from './geometry.js';
 import { hardOk } from './rank.js';
+import { checkRules } from './checkRules.js';
 
 /**
  * @param {import('../core/types.js').Room} room
@@ -25,7 +26,8 @@ export function scatterOnDesk(room, items, opts = {}) {
   const out = {};
   const order = [...items].sort((a, b) => volume(b.size) - volume(a.size) || (a.id < b.id ? -1 : 1));
   for (const it of order) {
-    if (existing[it.id]) continue;
+    // 互动乱桌也经过安全检查，不能绕过入住规则把禁用物品放上桌。
+    if (existing[it.id] || checkRules(it).banned) continue;
     const ownIt = { ...it, owner };   // 观众说的东西一律算在这张桌子主人名下
     let spot = engines[desk.id].findSpot(ownIt, { mode: 'near', origin });   // 不加专注区惩罚
     let eng = engines[desk.id];

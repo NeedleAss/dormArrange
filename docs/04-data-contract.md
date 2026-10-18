@@ -161,9 +161,13 @@
   powerW: number | null | undefined,                        // 额定功率，null 表示未知
   preferred: string[] | undefined,                          // 首选 slot，例如 ['underDesk','pubEntry']
   growthPerSemester: number | undefined,                    // 每学期增长的件数（书）
-  note: string | undefined
+  note: string | undefined,
+  // 2026-10-18 人类批准：AI 安全预检可补充风险，不能撤销本地硬规则。
+  safety: { status: 'blocked'|'review'|'clear', reason: string } | undefined
 }
 ```
+
+`safety` 为可选的 AI 安全预检结果：`blocked` 表示识别到明确危险，`review` 表示危险性、成分或用途待核实，`clear` 仅表示 AI 未发现风险，不是安全保证。`blocked` 和 `review` 均暂不安排宿舍位置，复用 `Verdict.status = 'banned'`，原因必须区分“明确拦截”与“安全待核实，暂不通过”；不得将待核实伪称为校规明确禁用。`clear` 不能覆盖校规、本地危险品或功率规则。AI 提取成功但安全字段缺失/非法时由 D 标记 `review`；本地离线解析不伪造 AI 结论，仍执行确定性安全规则。详情见 `tasks/CHANGES.md` 的人类授权记录。
 
 **Category 枚举**：`luggage` 行李 · `clothes` 衣物 · `bedding` 床品 · `books` 书 · `study` 文具资料 · `electronics` 电子 · `appliance` 电器 · `toiletry` 洗漱 · `storage` 收纳 · `food` 食品 · `sport` 运动/乐器 · `decor` 装饰 · `trash` 可丢弃 · `misc` 其他
 

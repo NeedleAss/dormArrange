@@ -70,7 +70,8 @@ export function planSeasons(room, items, opts = {}) {
   const months = [...(opts.months ?? DEFAULT_MONTHS)];
   const lockedZones = opts.lockedZones ?? [];
   const ctx = { lockedZones };
-  const usable = items.filter((it) => !checkRules(it).banned && !it.flags?.disposable && it.category !== 'trash');
+  const bannedIds = new Set(items.filter((it) => checkRules(it).banned).map((it) => it.id));
+  const usable = items.filter((it) => !bannedIds.has(it.id) && !it.flags?.disposable && it.category !== 'trash');
   const seasonal = usable.filter(isSeasonal).sort(byStr2);
   const anchors = usable.filter((it) => !isSeasonal(it));
 
@@ -100,7 +101,8 @@ export function planSeasons(room, items, opts = {}) {
   for (const m of months) {
     const eng = cloneEngines(baseEngines);
     const P = structuredClone(basePlacements);
-    const active = [], stored = [], overflow = [...anchorOverflow];
+    // 禁用物品全年都不能规划收纳；继续列为未安排，避免换季时从清单中悄然消失。
+    const active = [], stored = [], overflow = [...anchorOverflow, ...bannedIds];
     const state = {};
     const act = seasonal.filter((it) => activeAt(it, m));
     const inact = seasonal.filter((it) => !activeAt(it, m));
