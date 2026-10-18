@@ -142,6 +142,9 @@ export function checkRules(item) {}                                      // → 
 
 /** 加分：成长预测 */
 export function predictGrowth(items, room, opts = {}) {}                 // → GrowthForecast
+
+/** 加分：把任意物品"乱堆"到某人桌面附近，生成一张乱桌（观众互动：说出你桌上的东西 → 现场腾桌） */
+export function scatterOnDesk(room, items, opts = {}) {}                 // opts: { owner = 'A' } → Record<itemId, Placement>
 ```
 
 ### 4.2 scene — `src/scene/index.js`

@@ -478,6 +478,21 @@ syncAfter   = computeSync(room, items, placementsAfter, { focusBox, moves }).tot
 
 只要 moves 或 unresolved 有减少，就加入 `alternatives`，label 写成 `多花 ¥39，少挪 2 步`，按 moves 升序排列。
 
+### 5.8 乱桌生成器（加分）：`scatterOnDesk(room, items, { owner })`
+
+用于观众互动：把观众说出的桌面物品"像真实生活一样"堆在桌上，再现场腾桌。
+
+```
+desk = `${owner}.desk`；near = [desk, `${owner}.hutch`]
+for it in sort(items, by 体积 desc, id):
+  origin = 桌面局部的 (U/2, V × 0.35)            // 偏前、居中：乱桌的东西总堆在人面前
+  spot = engines[desk].findSpot(it, { mode: 'near', origin })   // 不加专注区惩罚
+  if !spot: 依次试 hutch、underDesk（store 模式）
+return placements
+```
+
+生成结果直接作为 `planFocusField` 的输入。
+
 ## 6. 第三话 换季：`planSeasons(room, items, opts)`
 
 ### 6.1 思路：宿舍里的时分复用（TDM）

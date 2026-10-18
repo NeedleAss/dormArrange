@@ -96,6 +96,21 @@ export const DEFAULT_PARAMS = {
 
 #### 公共分区（owner = 'pub'）
 
+公共分区的 slot 取值：
+
+| zone id | slot |
+|---|---|
+| entryL | `pubEntry` |
+| cornerL、cornerR | `pubCorner` |
+| doorBack | `doorBack` |
+| aisle | `aisle` |
+| doorSwing | `doorSwing` |
+| balcony | `balcony` |
+| balconyWalk | `balconyWalk` |
+| sinkShelf | `sinkShelf` |
+
+个人分区的 slot 就是 id 中点号后面的部分，例如 `A.underDesk` 的 slot 是 `underDesk`。
+
 | id | kind | x | z | y | tier | accepts |
 |---|---|---|---|---|---|---|
 | `pub.entryL` | floor（front `+x`） | [0, u.depth] | [0, u.startZ] | [0, 200] | 1 | `*` |
