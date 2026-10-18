@@ -29,7 +29,8 @@ export function createFurnitureView(fixture, room) {
   const batches = new Map();
   const edgeGeometries = [];
   const group = new THREE.Group();
-  const front = room.zones?.find((zone) => zone.owner === fixture.owner && zone.slot === 'desk')?.front;
+  const deskZone = room.zones?.find((zone) => zone.owner === fixture.owner && zone.slot === 'desk');
+  const front = deskZone?.front;
   const mirrored = front === '-x' || (!front && b.x + w / 2 > room.bounds.x + room.bounds.w / 2);
   group.position.set(b.x + (mirrored ? w : 0), b.y, b.z);
   if (mirrored) group.scale.x = -1;
@@ -112,16 +113,53 @@ export function createFurnitureView(fixture, room) {
   }
 
   function desk() {
-    block(0, 0, 0, w, h, d);
-    const leg = Math.min(3, w / 8, d / 12);
+    const planned = deskZone?.box;
+    // 主桌投影严格跟随可放置分区；fixture 只提供 L 桌的完整外包络。
+    const mainX = planned ? THREE.MathUtils.clamp(mirrored ? b.x + w - planned.x - planned.w : planned.x - b.x, 0, w) : 0;
+    const mainZ = planned ? THREE.MathUtils.clamp(planned.z - b.z, 0, d) : 0;
+    const mainW = planned ? Math.min(planned.w, w - mainX) : w;
+    const mainD = planned ? Math.min(planned.d, d - mainZ) : d;
+    block(mainX, 0, mainZ, mainW, h, mainD);
+    const wingW = w - mainX - mainW;
+    const sideZone = room.zones?.find((zone) => zone.owner === fixture.owner && zone.slot === 'underDesk');
+    // B 模板把桌下侧边储物段留在 z 后端；翼部只覆盖这段，凹口保持为空。
+    const wingD = sideZone ? Math.min(sideZone.box.d, mainD) : 0;
+    const wingZ = mainZ + mainD - wingD;
+    const shaped = (southern || modern) && wingW > 0.01 && wingD > 0;
+    if (shaped) block(mainX + mainW, 0, wingZ, wingW, h, wingD);
+
+    const leg = Math.min(3, mainW / 8, mainD / 12);
     const floor = -Math.max(0, b.y);
-    if (b.y > 0) {
-      for (const x of [leg / 2, w - leg / 2]) {
-        for (const z of [leg / 2, d - leg / 2]) rod([x, floor + leg / 2, z], [x, 0, z], leg / 2, modern ? 'light' : 'main');
+    if (b.y <= 0) return;
+    const backZone = room.zones?.find((zone) => zone.owner === fixture.owner && zone.slot === 'underDeskBack');
+    const cabinetD = southern && backZone ? THREE.MathUtils.clamp(backZone.box.z - b.z - mainZ, 0, mainD) : 0;
+    if (cabinetD > leg * 2) {
+      // 南区靠衣柜的抽屉段已由 B 排除规划容量，仅在该段补画桌体内部结构。
+      const t = Math.min(2, leg), cabinetH = -floor;
+      block(mainX, floor, mainZ, mainW, t, cabinetD);
+      block(mainX, floor, mainZ, mainW, cabinetH, t);
+      block(mainX, floor, mainZ + cabinetD - t, mainW, cabinetH, t);
+      for (let i = 0; i < 3; i += 1) {
+        const y = floor + i * cabinetH / 3;
+        block(mainX + mainW - t, y + 0.4, mainZ + t, t, cabinetH / 3 - 0.8, cabinetD - t * 2);
+        rod([mainX + mainW - 0.4, y + cabinetH / 6, mainZ + cabinetD * 0.32],
+          [mainX + mainW - 0.4, y + cabinetH / 6, mainZ + cabinetD * 0.68], 0.4);
       }
-      // 后横档位于桌面下方，不伸入脚前的通道。
-      rod([leg / 2, -Math.min(12, b.y * 0.2), leg], [leg / 2, -Math.min(12, b.y * 0.2), d - leg], leg / 3);
     }
+    for (const x of [mainX + leg / 2, mainX + mainW - leg / 2]) {
+      for (const z of [mainZ + leg / 2, mainZ + mainD - leg / 2]) {
+        if (cabinetD > 0 && z < mainZ + cabinetD) continue;
+        rod([x, floor + leg / 2, z], [x, 0, z], leg / 2, modern ? 'light' : 'main');
+      }
+    }
+    if (shaped) {
+      for (const z of [wingZ + leg / 2, mainZ + mainD - leg / 2]) {
+        rod([w - leg / 2, floor + leg / 2, z], [w - leg / 2, 0, z], leg / 2, modern ? 'light' : 'main');
+      }
+    }
+    // 后横档位于靠墙桌边下方，不伸入脚前凹口。
+    rod([mainX + leg / 2, -Math.min(12, b.y * 0.2), mainZ + leg],
+      [mainX + leg / 2, -Math.min(12, b.y * 0.2), mainZ + mainD - leg], leg / 3);
   }
 
   function bed() {
@@ -191,14 +229,28 @@ export function createFurnitureView(fixture, room) {
     block(0, 0, d - t, w, h, t);
     block(0, 0, t, t, h, d - t * 2);
     const gap = Math.min(0.8, d * 0.015);
-    for (let i = 0; i < 2; i += 1) {
-      const length = (d - t * 2 - gap) / 2;
-      sidePanel(w - t, t, t + i * (length + gap), t, h - t * 2, length, modern ? Math.min(4, length / 8) : 0.5);
-      const z = d / 2 + (i === 0 ? -1 : 1) * Math.min(4, d * 0.08);
-      // 把手贴合柜门前面，依旧不越出柜体包围盒。
-      rod([w - 0.35, h * 0.43, z], [w - 0.35, h * 0.57, z], 0.35);
+    const hang = room.zones?.find((zone) => zone.owner === fixture.owner && zone.slot === 'wardrobeHang');
+    const shelfEnd = modern && hang ? THREE.MathUtils.clamp(hang.box.z - b.z, 0, d) : 0;
+    if (shelfEnd > t * 3 && shelfEnd < d - t * 2) {
+      // 新装修柜体的非挂衣半边没有放置分区，层板限定在这里，避免穿过衣物。
+      block(0, t, shelfEnd - t, w, h - t * 2, t);
+      for (let i = 1; i <= 3; i += 1) block(t, h * i / 4, t, w - t, t, shelfEnd - t * 2);
+      const doorStart = shelfEnd + gap / 2;
+      sidePanel(w - t, t, doorStart, t, h - t * 2, d - t - doorStart, Math.min(4, d / 16));
+      const handleZ = doorStart + Math.min(4, (d - doorStart) * 0.15);
+      rod([w - 0.35, h * 0.43, handleZ], [w - 0.35, h * 0.57, handleZ], 0.35);
+      const rodY = hang.rod?.y === undefined ? h * 0.9 : THREE.MathUtils.clamp(hang.rod.y - b.y, t, h - t);
+      rod([w * 0.55, rodY, shelfEnd + t], [w * 0.55, rodY, d - t], Math.min(0.8, t / 2));
+    } else {
+      for (let i = 0; i < 2; i += 1) {
+        const length = (d - t * 2 - gap) / 2;
+        sidePanel(w - t, t, t + i * (length + gap), t, h - t * 2, length, modern ? Math.min(4, length / 8) : 0.5);
+        const z = d / 2 + (i === 0 ? -1 : 1) * Math.min(4, d * 0.08);
+        // 把手贴合柜门前面，依旧不越出柜体包围盒。
+        rod([w - 0.35, h * 0.43, z], [w - 0.35, h * 0.57, z], 0.35);
+      }
+      rod([w * 0.55, h * 0.9, t], [w * 0.55, h * 0.9, d - t], Math.min(0.8, t / 2));
     }
-    rod([w * 0.55, h * 0.9, t], [w * 0.55, h * 0.9, d - t], Math.min(0.8, t / 2));
   }
 
   function chair() {
