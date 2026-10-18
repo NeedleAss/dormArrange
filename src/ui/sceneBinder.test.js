@@ -45,7 +45,7 @@ test('初次绑定失败只警报一次，平面预览继续随状态更新', t 
   assert.equal(errors.mock.callCount(), 1);
 });
 
-for (const method of ['setRoom', 'setZoneStatus', 'setItems', 'setItemStates', 'setCamera', 'showFocusField', 'setFocusFieldState', 'showTolerance', 'focusOn']) {
+for (const method of ['setRoom', 'setZoneStatus', 'setItems', 'setItemStates', 'setCamera', 'setBloom', 'showFocusField', 'setFocusFieldState', 'showTolerance', 'focusOn']) {
   test(`运行中 ${method} 失败后退出场景且后续面板仍收到广播`, t => {
     const errors = t.mock.method(console, 'error', () => {});
     const store = createStore(createInitialState(planner));
@@ -55,7 +55,7 @@ for (const method of ['setRoom', 'setZoneStatus', 'setItems', 'setItemStates', '
     store.subscribe(() => { notified++; }, ['selection']);
     throwing = true;
     const s = store.get();
-    assert.doesNotThrow(() => store.set({ room: { ...s.room }, items: [...s.items], placements: {}, itemStates: {}, camera: 'top', episode: 'EP02', selection: 'A.desk' }));
+    assert.doesNotThrow(() => store.set({ room: { ...s.room }, items: [...s.items], placements: {}, itemStates: {}, camera: 'top', bloom: true, episode: 'EP02', selection: 'A.desk' }));
     assert.equal(failures, 1);
     assert.equal(notified, 1);
     assert.equal(errors.mock.callCount(), 1);
@@ -64,3 +64,53 @@ for (const method of ['setRoom', 'setZoneStatus', 'setItems', 'setItemStates', '
     assert.equal(errors.mock.callCount(), 1);
   });
 }
+
+test('发光只由状态变化同步，初始关闭且解绑后不再调用场景', () => {
+  const store = createStore(createInitialState(planner));
+  const calls = [];
+  const unsubscribe = bindScene(store, { setBloom: on => calls.push(on) });
+  assert.deepEqual(calls, [false]);
+  store.set({ bloom: true });
+  store.set({ bloom: true });
+  store.set({ camera: 'top' });
+  assert.deepEqual(calls, [false, true]);
+  store.set({ bloom: false });
+  assert.deepEqual(calls, [false, true, false]);
+  unsubscribe();
+  store.set({ bloom: true });
+  assert.deepEqual(calls, [false, true, false]);
+});
+
+test('场景缺席或没有发光接口时仍可更新开关', () => {
+  for (const scene of [null, {}]) {
+    const store = createStore(createInitialState(planner));
+    const unsubscribe = bindScene(store, scene);
+    assert.doesNotThrow(() => store.set({ bloom: true }));
+    assert.equal(store.get().bloom, true);
+    unsubscribe();
+  }
+});
+
+test('发光为临时偏好，忽略旧存储中的开关且不写入持久化数据', t => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  let saved = JSON.stringify({ bloom: true, focusMinutes: 10 });
+  let writes = 0;
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: () => saved,
+    setItem: (_key, value) => { saved = value; writes++; }
+  } });
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original);
+    else delete globalThis.localStorage;
+  });
+  const store = createStore(createInitialState(planner));
+  assert.equal(store.get().bloom, false);
+  store.set({ bloom: true });
+  assert.equal(writes, 0);
+  store.set({ focusMinutes: 25 });
+  assert.equal(writes, 1);
+  assert.deepEqual(Object.keys(JSON.parse(saved)).sort(), ['focusMinutes', 'roomParams', 'snapshots']);
+  const reloaded = createStore(createInitialState(planner));
+  assert.equal(reloaded.get().bloom, false);
+  assert.equal(reloaded.get().focusMinutes, 25);
+});

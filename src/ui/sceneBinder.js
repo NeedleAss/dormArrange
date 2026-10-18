@@ -62,6 +62,7 @@ export function bindScene(store, scene, fallbackElement = null, { onFailure } = 
     }
     if (has('itemStates')) call('setItemStates', s.itemStates);
     if (has('camera', 'owner', 'room')) call('setCamera', s.camera, { owner: s.owner });
+    if (has('bloom')) call('setBloom', s.bloom);
     if (has('movePlan', 'stepIndex', 'episode', 'sync')) {
       const plan = s.episode === 'EP02' ? s.movePlan : null;
       call('showFocusField', plan?.focusBox || null);

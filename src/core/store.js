@@ -42,6 +42,6 @@ export function createInitialState(planner) {
     focusSpec: { zoneId: 'A.desk', w: 75, d: 35 }, movePlan: null, stepIndex: 0,
     month: 9, tdm: true, tdmPlan: null, snapshots: [], focusMinutes: 0,
     timer: { running: false }, sync: null, syncHistory: [], selection: null,
-    camera: 'orbit', alerts: [], ai: { available: false, busy: false, lastSource: null }
+    camera: 'orbit', bloom: false, alerts: [], ai: { available: false, busy: false, lastSource: null }
   };
 }

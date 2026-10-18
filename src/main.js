@@ -78,6 +78,10 @@ function render() {
 document.querySelectorAll('[data-episode]').forEach(b => b.onclick = () => navigate(b.dataset.episode));
 document.addEventListener('keydown', event => {
   if (event.target.closest('input,textarea,select,[contenteditable]') || document.querySelector('.title-card,.boot-screen,.focus-limit')) return;
+  if (event.key.toLowerCase() === 'b' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    event.preventDefault();
+    store.set({ bloom: !store.get().bloom });
+  }
   if (/^[0-4]$/.test(event.key)) navigate(`EP0${event.key}`);
   if (event.key.toLowerCase() === 't') {
     const modes = ['orbit', 'top', 'seat'];

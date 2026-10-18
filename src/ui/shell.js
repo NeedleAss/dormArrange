@@ -15,7 +15,7 @@ export function mountShell(root, store) {
       <div id="scene-placeholder" class="scene-placeholder"><div id="blueprint-host"></div><div class="blueprint-caption"><i></i><b>空间预览</b></div></div>
       <div class="viewport-bottom"><div class="legend"><span style="--c:var(--green)">能放下</span><span style="--c:var(--amber)">需换位置</span><span style="--c:var(--cyan)">尺寸待定</span><span style="--c:var(--red)">冲突 / 滞留</span></div><span class="micro" id="scene-count">0 ITEMS / 0 ZONES</span></div></section>
     <aside class="right-rail depth-module depth-module-monitor" id="monitor" aria-label="系统监视器"><div class="rail-label"><span>状态监视</span></div><div id="monitor-content"></div></aside></main>
-    <footer class="bottom-bar"><div class="bottom-code"><strong id="footer-ep">EP00 / MODELING</strong></div><div id="episode-footer" class="episode-footer"></div><div class="camera-controls" aria-label="场景视角">${[['orbit', '斜视'], ['top', '俯视'], ['seat', '座位']].map(([mode, label]) => `<button class="btn compact" data-camera="${mode}">${label}</button>`).join('')}</div></footer>`;
+    <footer class="bottom-bar"><div class="bottom-code"><strong id="footer-ep">EP00 / MODELING</strong></div><div id="episode-footer" class="episode-footer"></div><div class="camera-controls" aria-label="场景视角与效果">${[['orbit', '斜视'], ['top', '俯视'], ['seat', '座位']].map(([mode, label]) => `<button class="btn compact" data-camera="${mode}">${label}</button>`).join('')}<button type="button" class="btn compact" id="bloom-toggle" aria-pressed="false" aria-keyshortcuts="B" title="帧率不足时自动关闭">发光</button></div></footer>`;
   const update = s => {
     const ep = EPISODES.find(e => e.id === s.episode);
     const hero = { EP00:['空间','重新定义'], EP01:['入住','一切各就各位'], EP02:['专注','即刻展开'], EP03:['时间','也是空间'], EP04:['生长','留有余地'] }[s.episode];
@@ -26,13 +26,17 @@ export function mountShell(root, store) {
     root.querySelector('#footer-ep').textContent = `${ep.id} / ${ep.en}`;
     root.querySelectorAll('[data-episode]').forEach(b => { b.classList.toggle('active', b.dataset.episode === s.episode); b.setAttribute('aria-current', b.dataset.episode === s.episode ? 'step' : 'false'); });
     root.querySelectorAll('[data-camera]').forEach(b => b.classList.toggle('active', b.dataset.camera === s.camera));
+    const bloomButton = root.querySelector('#bloom-toggle');
+    bloomButton.classList.toggle('active', !!s.bloom);
+    bloomButton.setAttribute('aria-pressed', String(!!s.bloom));
     root.querySelector('#scene-count').textContent = `${s.items.length} 件 / ${s.room?.zones.length || 0} 分区`;
     root.querySelector('#ai-status').textContent = s.ai.busy ? '● 解析中' : s.ai.available ? '● AI 在线' : '● 本地';
     root.querySelector('#ai-status').className = s.ai.available ? 'green' : 'muted';
   };
-  store.subscribe(update, ['episode', 'camera', 'items', 'room', 'ai']);
+  store.subscribe(update, ['episode', 'camera', 'bloom', 'items', 'room', 'ai']);
   update(store.get());
   root.querySelectorAll('[data-camera]').forEach(button => button.onclick = () => store.set({ camera: button.dataset.camera }));
+  root.querySelector('#bloom-toggle').onclick = () => store.set({ bloom: !store.get().bloom });
   const toggle = root.querySelector('#monitor-toggle');
   toggle.onclick = () => { const open = root.querySelector('#monitor').classList.toggle('open'); toggle.setAttribute('aria-expanded', String(open)); };
   const tick = () => { root.querySelector('#clock').textContent = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date()); };
