@@ -5,6 +5,7 @@
 - **输入数据**：`docs/04-data-contract.md` 中的 Room / Zone / Fixture / Item / Placement / MoveStep
 - **视觉规范**：`docs/06-eva-style.md` §6（3D）和 §2（颜色）
 - **不依赖 planner 的实现。** B0 推送前，先用 `docs/04-data-contract.md` §8 的示例 JSON 自测，放在 `src/scene/__mock__.js`。
+- **独立测试台**：建 `src/scene/__dev__.html` 和 `__dev__.js`，放一排按钮逐个调用 Scene API，访问 http://localhost:5173/src/scene/__dev__.html 。这样不依赖 C 车道外壳也能自测（见 docs/03 §4.2）。
 - three 已安装。附加模块从 `three/examples/jsm/...` 引入：OrbitControls、CSS2DRenderer、EffectComposer、UnrealBloomPass。
 
 ---

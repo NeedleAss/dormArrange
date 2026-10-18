@@ -160,6 +160,8 @@ export function createScene(container, { onSelect, onHover } = {}) {
     showFocusField(box),                        // box = null 表示清除
     setFocusFieldState(state),                  // 'conflict' | 'clear'
     playSteps(steps, { stepMs = 900, onStep, onDone }),   // → { pause, resume, seek(i), stop }
+                                                // onStep(i)：第 i 步开始播放时调用；onDone()：全部播完后调用
+                                                // seek(i)：直接跳到“第 i 步完成后”的状态，不播动画
     setCamera(mode, { owner = 'A' }),           // 'orbit' | 'top' | 'seat'
     focusOn(id),                                // itemId 或 zoneId
     setBloom(on),                               // 加分
@@ -169,7 +171,9 @@ export function createScene(container, { onSelect, onHover } = {}) {
 }
 ```
 
-scene 只认 docs/04 的数据形状，**不 import planner**。需要的几何信息（例如 seat 视角要找 `A.desk`）都从 `room.zones` 里取。
+scene 只认 docs/04 的数据形状，**不 import planner**。
+
+A 车道可以在 `src/scene/__dev__.html` 和 `__dev__.js` 建一个**独立测试台**，访问地址是 http://localhost:5173/src/scene/__dev__.html 。它不进入 build，只用于不依赖 C 车道外壳时单独调试 3D。测试台本身允许动态 import `planner/index.js`，以便拿真实的 buildRoom 和 PRESETS；scene 的正式模块仍然不能 import planner。需要的几何信息（例如 seat 视角要找 `A.desk`）都从 `room.zones` 里取。
 
 ### 4.3 ai — `src/ai/index.js`
 
