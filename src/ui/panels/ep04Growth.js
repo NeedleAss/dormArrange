@@ -1,5 +1,6 @@
 import { esc, clone } from '../helpers.js';
 import { sparkline } from '../widgets/monitor.js';
+import { createSnapshotThumb, isSnapshotThumb } from '../snapshotThumb.js';
 import '../../styles/growth.css';
 
 let cleanup = () => {};
@@ -21,6 +22,7 @@ export function mount(el, ctx) {
   let active = true;
   let selectedId = null;
   let playing = false;
+  let saving = false;
   let playbackTimer = null;
   let replayIds = [];
   let replayIndex = 0;
@@ -103,28 +105,44 @@ export function mount(el, ctx) {
     }
   }
 
-  function saveSnapshot(event) {
+  async function saveSnapshot(event) {
     event.preventDefault();
+    if (saving) return;
     if (!form.reportValidity()) return;
     const label = nameInput.value.trim();
     if (!label) { nameInput.focus(); return; }
     const state = store.get();
     if (!state.room || !state.roomParams) { ctx.alert('先完成宿舍建模，再保存快照。', 'warning'); return; }
+    saving = true;
+    form.setAttribute('aria-busy', 'true');
+    renderStats(state);
+    stopPlayback(false);
     try {
       const sync = planner.computeSync(state.room, state.items, state.placements, { owner: state.owner });
       if (!Number.isFinite(sync?.total)) throw new Error('invalid sync');
+      let source = null;
+      try { source = ctx.scene?.snapshot?.() ?? null; } catch { /* 缩略图失败不影响文字档案。 */ }
+      // 先固定点击时的数据；图像解码期间切话、载入别的布局不会改变这份档案。
       const snapshot = clone({
         id: crypto.randomUUID(), label, semester: semesterInput.value,
         createdAt: new Date().toISOString(), roomParams: state.roomParams,
         items: state.items, placements: state.placements, sync: sync.total, focusMinutes: state.focusMinutes
       });
-      stopPlayback(false);
-      selectedId = snapshot.id;
+      const thumb = await createSnapshotThumb(source);
+      if (thumb) snapshot.thumb = thumb;
       // 保存只追加档案；后续专注完成触发渲染时，绝不把档案中的旧时长重新写回。
-      store.set({ snapshots: [...state.snapshots, snapshot], sync });
-      nameInput.value = '';
+      const latestState = store.get();
+      const unchanged = latestState.room === state.room && latestState.items === state.items
+        && latestState.placements === state.placements && latestState.owner === state.owner;
+      if (active && unchanged) selectedId = snapshot.id;
+      store.set({ snapshots: [...latestState.snapshots, snapshot], ...(unchanged ? { sync } : {}) });
+      if (active && nameInput.value.trim() === label) nameInput.value = '';
       ctx.alert(`已保存「${label}」：同步率 ${sync.total}%。`, 'success');
     } catch { ctx.alert('快照保存失败，请检查当前布局数据。', 'error'); }
+    finally {
+      saving = false;
+      if (active) { form.removeAttribute('aria-busy'); renderStats(store.get()); }
+    }
   }
 
   function loadPreset() {
@@ -179,7 +197,7 @@ export function mount(el, ctx) {
     const duration = Math.max(0, Number(preview ? preview.focusMinutes : state.focusMinutes) || 0);
     minutes.innerHTML = `${duration.toLocaleString('zh-CN')}<small>min</small>`;
     itemCount.innerHTML = `${state.items.length}<small>件</small>`;
-    saveButton.disabled = !state.room || !!state.timer?.running;
+    saveButton.disabled = saving || !state.room || !!state.timer?.running;
     forecastButton.disabled = !planner.predictGrowth || !state.room || !state.items.length;
   }
 
@@ -195,8 +213,8 @@ export function mount(el, ctx) {
     presetButton.disabled = !presets.length || !!state.timer?.running;
     replayButton.disabled = snapshots.length < 2 || !!state.timer?.running;
     replayButton.textContent = playing ? '停止回放' : '回放';
-    records.innerHTML = snapshots.length ? snapshots.map(snapshot => `<button class="growth-record${snapshot.id === selectedId ? ' active' : ''}" type="button" data-snapshot="${esc(snapshot.id)}" aria-pressed="${snapshot.id === selectedId}"${state.timer?.running ? ' disabled' : ''}><span class="growth-record-label"><strong>${esc(snapshot.label)}</strong><small>${esc(semesterLabel(snapshot.semester))} · ${snapshot.items.length} 件物品 · ${snapshot.focusMinutes} min</small></span><span class="growth-record-sync mono">${snapshot.sync}<small>%</small></span></button>`).join('') : '<p class="empty">暂无快照。</p>';
-    timeline.innerHTML = snapshots.length ? snapshots.map(snapshot => `<button class="growth-node${snapshot.id === selectedId ? ' active' : ''}" type="button" data-snapshot="${esc(snapshot.id)}" title="${esc(snapshot.label)}" aria-label="${esc(snapshot.label)}，同步率 ${snapshot.sync}%，${esc(semesterLabel(snapshot.semester))}" aria-pressed="${snapshot.id === selectedId}"${state.timer?.running ? ' disabled' : ''}><span class="growth-node-sync mono">${snapshot.sync}%</span><i aria-hidden="true"></i><span class="growth-node-semester">${esc(semesterLabel(snapshot.semester))}</span></button>`).join('') : '<span class="hint growth-timeline-empty">暂无快照</span>';
+    records.innerHTML = snapshots.length ? snapshots.map(snapshot => `<button class="growth-record${snapshot.id === selectedId ? ' active' : ''}" type="button" data-snapshot="${esc(snapshot.id)}" aria-pressed="${snapshot.id === selectedId}"${state.timer?.running ? ' disabled' : ''}>${isSnapshotThumb(snapshot.thumb) ? `<img src="${esc(snapshot.thumb)}" alt="${esc(snapshot.label)}" width="64" height="40" loading="lazy" style="object-fit:cover;flex-shrink:0">` : ''}<span class="growth-record-label"><strong>${esc(snapshot.label)}</strong><small>${esc(semesterLabel(snapshot.semester))} · ${snapshot.items.length} 件物品 · ${snapshot.focusMinutes} min</small></span><span class="growth-record-sync mono">${snapshot.sync}<small>%</small></span></button>`).join('') : '<p class="empty">暂无快照。</p>';
+    timeline.innerHTML = snapshots.length ? snapshots.map(snapshot => `<button class="growth-node${snapshot.id === selectedId ? ' active' : ''}" type="button" data-snapshot="${esc(snapshot.id)}" title="${esc(snapshot.label)}" aria-label="${esc(snapshot.label)}，同步率 ${snapshot.sync}%，${esc(semesterLabel(snapshot.semester))}" aria-pressed="${snapshot.id === selectedId}"${state.timer?.running ? ' disabled' : ''}><span class="growth-node-sync mono">${snapshot.sync}%</span>${isSnapshotThumb(snapshot.thumb) ? `<img src="${esc(snapshot.thumb)}" alt="${esc(snapshot.label)}" width="48" height="24" loading="lazy" style="object-fit:cover;display:block">` : '<i aria-hidden="true"></i>'}<span class="growth-node-semester">${esc(semesterLabel(snapshot.semester))}</span></button>`).join('') : '<span class="hint growth-timeline-empty">暂无快照</span>';
     current.classList.toggle('playing', playing);
     current.innerHTML = selected ? `<span class="micro">${playing ? '回放 / ' : ''}${esc(semesterLabel(selected.semester))}</span><strong>${esc(selected.label)}</strong><small>${selected.items.length} 件物品 · 快照同步率 ${selected.sync}%</small>` : '<strong>当前布局</strong>';
     if (focusId) [...focusHost.querySelectorAll('[data-snapshot]')].find(button => button.dataset.snapshot === focusId)?.focus({ preventScroll: true });
