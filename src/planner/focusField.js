@@ -63,7 +63,7 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
   const conflictSet = new Set();
   const deskLocked = lockedZones.includes(desk.id);
   const onDesk = Object.values(placements).filter((p) => p.zoneId === desk.id && byId[p.itemId]).sort((a, b) => byStr(a.itemId, b.itemId));
-  if (!deskLocked) {
+  {
     for (const p of onDesk) {
       if (byId[p.itemId].flags?.focusTool) continue;
       const l = boxToLocal(desk, p.box);
@@ -80,6 +80,20 @@ export function planFocusField(room, items, placements, spec = {}, opts = {}) {
     }
   }
   const conflicts = [...conflictSet].sort(byStr);
+
+  // 书桌锁定：照常报出冲突，但不生成任何移动，冲突物品全部列为未解决
+  if (deskLocked) {
+    const sync = computeSync(room, items, placements, { owner, focusBox }).total;
+    return {
+      focusZoneId: desk.id,
+      focusBox,
+      conflicts,
+      steps: [],
+      unresolved: conflicts.map((id) => ({ itemId: id, reason: '书桌已锁定', suggestion: '解锁书桌后再腾桌' })),
+      placementsAfter: structuredClone(placements),
+      metrics: { moves: 0, distanceCm: 0, estSeconds: 0, clearedArea: 0, syncBefore: sync, syncAfter: sync }
+    };
+  }
 
   // ── §5.3 逐件找落点 ──
   const cur = structuredClone(placements);

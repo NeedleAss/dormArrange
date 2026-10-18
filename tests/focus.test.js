@@ -105,3 +105,18 @@ test('力场尺寸预设：35×25 与 90×40；空桌没有步骤', () => {
   assert.equal(empty.steps.length, 0);
   assert.equal(empty.metrics.syncAfter >= empty.metrics.syncBefore, true);
 });
+
+test('书桌锁定：照常报出冲突，不生成步骤，冲突全部进 unresolved', () => {
+  const locked = planFocusField(room, items, placements, {}, { lockedZones: ['A.desk'] });
+  assert.deepEqual(locked.conflicts, plan.conflicts);
+  assert.equal(locked.steps.length, 0);
+  assert.deepEqual(locked.unresolved.map((u) => u.itemId), plan.conflicts);
+  for (const u of locked.unresolved) {
+    assert.equal(u.reason, '书桌已锁定');
+    assert.equal(u.suggestion, '解锁书桌后再腾桌');
+  }
+  assert.deepEqual(locked.placementsAfter, placements);
+  assert.equal(locked.metrics.moves, 0);
+  assert.equal(locked.metrics.syncAfter, locked.metrics.syncBefore);
+  assert.equal(locked.metrics.syncBefore, plan.metrics.syncBefore);
+});
