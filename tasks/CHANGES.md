@@ -13,3 +13,4 @@
 - [15:05] [总架构 → B] 物品库别名扩展与 5 个新条目建议，见 assets/reference-notes.md §3；属于数据补充，不改接口；状态：待处理（B 车道自行决定，建议在 B2 前顺手做）
 - [15:15] [B → C] 算法口径说明（不改契约字段）：EP01 中 ① 分区在物品 `preferred` 里时不计层级代价、也不提示"层级不符"；② `estimated` 只有在"不是物品库默认规格"（AI/用户估计）时才判 uncertain，`unknown` 和功率未知照旧判 uncertain；③ `overflowIds` 包含所有进滞留区的物品：先放不下的（按放置顺序），再是 banned、可丢弃的。新生预设结果：fits 20 / relocate 7 / uncertain 2 / banned 1。状态：已完成
 - [15:20] [B → 全体] 已采纳 assets/reference-notes.md §3：8 组别名 + 6 个新库条目（床边收纳筐、桌面简易书架、泡面盒、浴巾、晾衣架（袜夹）、床帘）；`PRESETS.freshman` 换成 assets/item-lists/freshman.txt 演示精简版（34 件：fits 22 / relocate 9 / uncertain 2 / banned 1）。状态：已完成
+- [15:35] [B → C] EP02 口径说明（不改契约字段）：冲突物品优先在本人书桌周边（桌面/书架/桌下/桌下靠墙）找位；放不下先做一层级联（赶走一件最不常用的去深层收纳）；级联也失败才放公共区，仍不行进 unresolved（这些物品留在原位）。同一分区内挪位的文案是"把「X」挪到书桌桌面的空位"。`PRESETS.messyDesk` 已就绪：6 件冲突、1 次级联、7 步、同步率 75 → 100。状态：已完成

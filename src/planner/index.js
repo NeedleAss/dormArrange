@@ -10,6 +10,7 @@ export { parseItemsText } from './parseText.js';
 export { zoneFill } from './engines.js';
 export { planMoveIn } from './moveIn.js';
 export { computeSync } from './sync.js';
+export { planFocusField, applySteps } from './focusField.js';
 
 const DEFAULT_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -17,38 +18,6 @@ const DEFAULT_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
 function mockSync() {
   return { total: 0, parts: { fit: 0, access: 0, focus: 0, safety: 1 },
     votes: { time: true, space: false, mind: false }, notes: [] };
-}
-
-/** EP02：腾出专注区（mock：steps 为空） */
-export function planFocusField(room, items, placements, focusSpec = {}, opts = {}) {
-  const zoneId = focusSpec.zoneId ?? 'A.desk';
-  const desk = room.zones.find((z) => z.id === zoneId);
-  const focusBox = desk ? { ...desk.box } : { x: 0, y: 0, z: 0, w: 0, d: 0, h: 0 };
-  return {
-    focusZoneId: zoneId,
-    focusBox,
-    conflicts: [],
-    steps: [],
-    unresolved: [],
-    placementsAfter: structuredClone(placements),
-    metrics: { moves: 0, distanceCm: 0, estSeconds: 0, clearedArea: 0, syncBefore: 0, syncAfter: 0 }
-  };
-}
-
-/** EP02 辅助：把前 upto 步应用到 placements 上；dispose 步骤删除该 placement */
-export function applySteps(placements, steps, upto = steps.length) {
-  const out = structuredClone(placements);
-  const n = Math.max(0, Math.min(upto, steps.length));
-  for (let i = 0; i < n; i++) {
-    const st = steps[i];
-    if (st.kind === 'dispose' || !st.to) { delete out[st.itemId]; continue; }
-    const prev = out[st.itemId];
-    out[st.itemId] = st.placement
-      ? structuredClone(st.placement)
-      : { itemId: st.itemId, zoneId: st.toZoneId, box: { ...st.to },
-          rot: prev?.rot ?? 0, lying: prev?.lying ?? false, layer: prev?.layer ?? 0, compressed: prev?.compressed ?? false };
-  }
-  return out;
 }
 
 /** EP03：时分复用换季规划（mock：每月空） */

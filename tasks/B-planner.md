@@ -67,7 +67,7 @@
 
 ## B3 第二话 腾桌：`planFocusField`（25 分钟）
 
-- [ ] 实现 docs/05 §5：
+- [x] 实现 docs/05 §5：
   - 力场矩形计算
   - 冲突检测（含叠在冲突物品上面的物品）
   - 逐件找落点（near 模式）
@@ -75,8 +75,8 @@
   - 可丢弃物品直接生成"扔掉"步骤
   - 步骤排序和中文指令
   - metrics
-- [ ] 导出 `applySteps(placements, steps, upto)`，供 UI 拖动步骤条时使用。
-- [ ] `tests/focus.test.js`，用 `PRESETS.messyDesk`，断言：
+- [x] 导出 `applySteps(placements, steps, upto)`，供 UI 拖动步骤条时使用。
+- [x] `tests/focus.test.js`，用 `PRESETS.messyDesk`，断言：
   - 应用 `placementsAfter` 后，力场内没有任何物品
   - 不在冲突列表里的物品位置不变（级联移动的除外）
   - 锁定分区里的物品不变
@@ -101,7 +101,7 @@
 - [x] `parseItemsText`：实现 docs/05 §8，支持中文数字、数量词、"寸"、"长×宽×高"、功率（W/瓦）；匹配不到物品库的物品，sizeSource 设为 `'unknown'`。
 - [ ] `src/data/demoPresets.js` 导出 `PRESETS`（具体见 docs/07 §4）：
   - [x] `freshman`：新生清单的文本
-  - `messyDesk`：老生乱桌，包含 items 和 placements，用 `buildRoom()` 的 A.desk 等分区
+  - [x] `messyDesk`：老生乱桌，包含 items 和 placements，用 `buildRoom()` 的 A.desk 等分区
   - `growth`：4 个快照
 - [ ] 队友收集到真实清单后，替换掉示例数据，但要保持各测试的断言仍然成立。
 - [x] `tests/parse.test.js`：输入 `"24寸行李箱，两床被子，27寸显示器，书20本，1500W电热水壶"`，断言：
