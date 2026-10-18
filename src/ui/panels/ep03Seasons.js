@@ -41,6 +41,7 @@ export function mount(el, ctx) {
     <div class="section-title">换季清单 <span class="season-transition"></span></div><div class="season-orders"></div>`;
   footer.innerHTML = `<div class="season-month-control"><div><span class="micro">月份</span><output class="season-month-output mono">09 月</output><span class="season-year-label">本学年</span></div><input class="season-month-slider" type="range" min="0" max="11" step="1" value="0" aria-label="换季月份：九月至次年八月"><div class="season-slider-labels"><span>9 月</span><span>次年 8 月</span></div></div>`;
   const toggle = el.querySelector('[data-season-tdm]');
+  const exampleButton = el.querySelector('[data-season-example]');
   const playButton = el.querySelector('[data-season-play]');
   const slider = footer.querySelector('.season-month-slider');
   const spectrum = el.querySelector('.season-spectrum-viewport');
@@ -173,7 +174,7 @@ export function mount(el, ctx) {
     const hasItems = !!state.items.length;
     toggle.checked = state.tdm;
     toggle.disabled = !state.room;
-    el.querySelector('.season-empty').hidden = hasItems;
+    exampleButton.textContent = hasItems ? '载入换季示例（会替换当前物品）' : '载入换季示例';
     el.querySelector('.season-status').textContent = error || (busy ? '计算中…' : !state.room ? '宿舍模板加载中' : !hasItems ? '载入示例或添加物品。' : `${state.items.length} 件物品`);
     el.querySelector('.season-status').classList.toggle('error', !!error);
     el.querySelector('.season-month-number').innerHTML = `${String(state.month).padStart(2, '0')}<small>月</small>`;
@@ -190,9 +191,9 @@ export function mount(el, ctx) {
     renderComparison(state);
   }
 
-  el.querySelector('[data-season-example]').onclick = () => {
-    if (store.get().items.length) return;
+  exampleButton.onclick = () => {
     try {
+      // 仅在明确点击后替换；乱桌的小风扇不能阻止载入含冬被、羽绒服的完整示例。
       const items = planner.parseItemsText(planner.PRESETS.freshman, { owner: store.get().owner, idPrefix: 'season' });
       if (!items.length) throw new Error('empty');
       store.set({ items, placements: {}, itemStates: {}, fitReport: null, movePlan: null, tdmPlan: null, sync: null, selection: null });
