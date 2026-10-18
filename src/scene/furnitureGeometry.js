@@ -230,6 +230,18 @@ export function createFurnitureView(fixture, room) {
     block(0, 0, d - t, w, h, t);
     block(0, 0, t, t, h, d - t * 2);
     const gap = Math.min(0.8, d * 0.015);
+    if (fixture.id === 'pub.cabinetBank#fx') {
+      // 照片左前方为通高柜组，按三段柜门表达，不能再画床桌或梯子。
+      const span = (d - t * 2) / 3;
+      for (let i = 0; i < 3; i += 1) {
+        const start = t + i * span + gap / 2;
+        sidePanel(w - t, t, start, t, h - t * 2, span - gap, 1.2);
+        const handleZ = start + Math.min(4, span * 0.12);
+        rod([w - 0.35, h * 0.43, handleZ], [w - 0.35, h * 0.57, handleZ], 0.35);
+        if (i > 0) block(t, t, t + i * span - t / 2, w - t, h - t * 2, t);
+      }
+      return;
+    }
     const hang = room.zones?.find((zone) => zone.owner === fixture.owner && zone.slot === 'wardrobeHang');
     const shelfEnd = modern && hang ? THREE.MathUtils.clamp(hang.box.z - b.z, 0, d) : 0;
     if (shelfEnd > t * 3 && shelfEnd < d - t * 2) {
