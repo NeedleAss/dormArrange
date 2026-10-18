@@ -187,6 +187,24 @@ test('相同文本请求复用内存缓存', async (t) => {
   assert.equal(calls.filter(({ url }) => url === '/ai/__config').length, 1);
 });
 
+test('forgetChat 只清除相同消息和 JSON 模式的缓存', async (t) => {
+  let count = 0;
+  const { client, requests } = await mockClient(t, () => chatResponse(`测试结果${++count}`));
+  const otherMessages = messages.map((message) => ({ ...message }));
+  otherMessages[1].content = '另一条已成功的文本';
+  const original = await client.chat(messages);
+  const other = await client.chat(otherMessages);
+  const plain = await client.chat(messages, { json: false });
+  // 等待已完成请求的在途标记释放，随后验证持久缓存的精确删除。
+  await Promise.resolve();
+
+  client.forgetChat(messages.map((message) => ({ ...message })));
+  assert.notEqual(await client.chat(messages), original);
+  assert.equal(await client.chat(otherMessages), other);
+  assert.equal(await client.chat(messages, { json: false }), plain);
+  assert.equal(requests().length, 4);
+});
+
 test('不同文本同时调用时，最多只有一个生成请求在途', async (t) => {
   let active = 0;
   let peakActive = 0;

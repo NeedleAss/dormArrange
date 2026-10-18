@@ -96,6 +96,17 @@ async function request(messages, { json, timeoutMs, images }) {
 }
 
 /**
+ * 上层校验发现模型文本不可用时，仅清除此请求的缓存，不影响其他成功结果。
+ * @param {{role:string, content:string}[]} messages
+ * @param {{json?:boolean}} [options]
+ */
+export function forgetChat(messages, { json = true } = {}) {
+  const identity = JSON.stringify({ messages, json });
+  const key = hash(identity);
+  if (cache.get(key)?.identity === identity) cache.delete(key);
+}
+
+/**
  * 返回模型纯文本。仅内存缓存文字请求；照片既不缓存也不写入日志。
  * @param {{role:string, content:string}[]} messages
  * @param {{json?:boolean, timeoutMs?:number, images?:string[]}} [options]

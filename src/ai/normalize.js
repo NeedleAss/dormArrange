@@ -22,20 +22,29 @@ function comparable(value) {
 /** 按最长名称/别名命中，纯寸数别名必须与物品种类相容。 */
 function findLibrary(name, category) {
   const text = comparable(name);
+  const inch = text.match(/\d+(?:\.\d+)?寸/)?.[0];
+  const monitor = /显示器|屏幕|显示屏/.test(text);
+  const luggage = /行李箱|登机箱|拉杆箱/.test(text);
+  const family = monitor && !luggage ? 'monitor' : luggage && !monitor ? 'luggage'
+    : category === 'electronics' ? 'monitor' : category === 'luggage' ? 'luggage' : '';
   let found;
   let longest = 0;
+  let specificity = 0;
   for (const entry of LIBRARY) {
     for (const alias of [entry.name, ...(entry.aliases ?? [])]) {
       const word = comparable(alias);
-      if (!word || !text.includes(word) || word.length <= longest) continue;
+      if (!word || !text.includes(word) || word.length < longest) continue;
       if (/^\d+(?:\.\d+)?寸$/.test(word)) {
-        const monitor = /显示器|屏幕|显示屏/.test(text);
-        const luggage = /行李箱|登机箱|拉杆箱/.test(text);
         if (entry.libId.startsWith('luggage-') && (monitor || (!luggage && category !== 'luggage'))) continue;
         if (entry.libId.startsWith('monitor-') && (luggage || (!monitor && category !== 'electronics'))) continue;
       }
+      // 等长时用同类物品的明确寸数破除歧义，例如“显示器27寸”。
+      const exactInch = inch && family && entry.libId.startsWith(`${family}-`)
+        && comparable(entry.name).match(/\d+(?:\.\d+)?寸/)?.[0] === inch ? 1 : 0;
+      if (word.length === longest && exactInch <= specificity) continue;
       found = entry;
       longest = word.length;
+      specificity = exactInch;
     }
   }
   return found;
@@ -103,8 +112,20 @@ function flagsFrom(raw, base) {
   };
   if (raw.compressible === true) flags.compressible = 0.4;
   else if (typeof raw.compressible !== 'boolean' && typeof base?.compressible === 'number') flags.compressible = base.compressible;
-  if (base?.container) flags.container = { ...base.container };
   return flags;
+}
+
+/** 未确认尺寸不推定内部容积；已知外尺寸缩小时按原内外比例保守缩小。 */
+function containerFrom(base, size, uncertain) {
+  const original = base?.flags.container;
+  if (!original || uncertain) return undefined;
+  const axes = ['w', 'd', 'h'];
+  if (axes.every((axis) => size[axis] === base.size[axis])) return { ...original };
+  return Object.fromEntries(axes.map((axis) => {
+    const value = Math.min(original[axis], size[axis], original[axis] * Math.min(1, size[axis] / base.size[axis]));
+    // 向下保留小数，避免四舍五入扩大本就只是推定的内部容积。
+    return [axis, Math.floor(value * 100) / 100];
+  }));
 }
 
 /** 解析不包含供应商原文的固定错误，避免错误信息透传。 */
@@ -188,6 +209,9 @@ export function normalizeItems(rawText, { owner = 'A', text = '', photo = false 
     for (let index = 0; index < pieces; index += 1) {
       const fraction = category === 'books' ? Math.min(10, qty - index * 10) / 10 : 1;
       const itemSize = { ...size, h: Math.max(1, Math.round(size.h * fraction * 100) / 100) };
+      const itemFlags = { ...flags };
+      const container = containerFrom(base, itemSize, source === 'unknown' || photo);
+      if (container) itemFlags.container = container;
       const item = {
         id: `ai-${String(items.length + 1).padStart(3, '0')}`,
         name: pieces > 1 ? `${name} #${index + 1}` : name,
@@ -196,7 +220,7 @@ export function normalizeItems(rawText, { owner = 'A', text = '', photo = false 
         sizeSource: source,
         freq,
         owner: safeOwner,
-        flags: { ...flags, ...(flags.container ? { container: { ...flags.container } } : {}) },
+        flags: itemFlags,
         powerW,
       };
       if (library) item.libId = library.libId;

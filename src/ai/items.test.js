@@ -109,6 +109,13 @@ test('24寸显示器不会误匹配为24寸行李箱，明确规格保留 AI 尺
   assert.equal(result.flags.fragile, true);
 });
 
+test('寸数在名称末尾时按27寸匹配正确的显示器库条目', () => {
+  const { items: [result] } = normalize([item({
+    name: '显示器27寸', category: 'electronics', size_cm: { w: 61, d: 20, h: 46 }, size_confidence: 'product',
+  })], { text: '显示器27寸' });
+  assert.equal(result.libId, 'monitor-27');
+});
+
 test('unknown 尺寸不被物品库标准尺寸与 product 来源覆盖', () => {
   const size = { w: 43, d: 31, h: 24 };
   const { items: [result] } = normalize([item({
@@ -116,6 +123,33 @@ test('unknown 尺寸不被物品库标准尺寸与 product 来源覆盖', () => 
   })]);
   assert.equal(result.sizeSource, 'unknown');
   assert.deepEqual(result.size, size);
+});
+
+test('unknown 行李箱和照片行李箱不推断可用内容积', () => {
+  const suitcase = item({
+    name: '24寸行李箱', category: 'luggage', size_cm: { w: 30, d: 20, h: 40 }, size_confidence: 'unknown',
+  });
+  const unknown = normalize([suitcase]).items[0];
+  const photo = normalize([{ ...suitcase, size_confidence: 'product' }], { photo: true }).items[0];
+  assert.equal(unknown.flags.container, undefined);
+  assert.equal(photo.flags.container, undefined);
+});
+
+test('显式缩小行李箱时内容积不超过外尺寸和物品库，默认24寸箱不变', () => {
+  const base = makeItem('luggage-24');
+  const { items: [smaller] } = normalize([item({
+    name: '24寸行李箱', category: 'luggage', size_cm: { w: 30, d: 20, h: 40 }, size_confidence: 'product',
+  })], { text: '24寸行李箱，外尺寸30×20×40cm' });
+  assert.deepEqual(smaller.size, { w: 30, d: 20, h: 40 });
+  assert.ok(smaller.flags.container);
+  for (const dimension of ['w', 'd', 'h']) {
+    assert.ok(smaller.flags.container[dimension] < smaller.size[dimension]);
+    assert.ok(smaller.flags.container[dimension] <= base.flags.container[dimension]);
+  }
+  const { items: [standard] } = normalize([item({
+    name: '24寸行李箱', category: 'luggage', size_cm: base.size, size_confidence: 'product',
+  })]);
+  assert.deepEqual(standard.flags.container, base.flags.container);
 });
 
 test('用户原句中的不确定提示优先于 AI product，但不影响其他物品', () => {
@@ -199,14 +233,17 @@ test('模型只能提供受限字段，不透传原型或额外属性', () => {
 test('aiParseItems 模拟 AI 成功、坏 JSON、空结果和服务失败均返回稳定结果', async (t) => {
   const originalFetch = globalThis.fetch;
   const calls = [];
+  const textCalls = new Map();
   globalThis.fetch = async (url, init = {}) => {
     calls.push(url);
     if (url === '/ai/__config') return jsonResponse({ enabled: true, model: 'test-model', wire: 'chat', vision: false });
     const body = JSON.parse(init.body);
     const text = body.messages.findLast(({ role }) => role === 'user').content;
+    const count = (textCalls.get(text) ?? 0) + 1;
+    textCalls.set(text, count);
     if (text.includes('服务失败测试')) return jsonResponse({}, 503);
-    const content = text.includes('非法结果测试') ? 'not-json'
-      : text.includes('空结果测试') ? '{"items":[]}' : JSON.stringify({ items: acceptanceItems() });
+    const content = text.includes('非法结果测试') && count === 1 ? 'not-json'
+      : text.includes('空结果测试') && count === 1 ? '{"items":[]}' : JSON.stringify({ items: acceptanceItems() });
     return jsonResponse({ choices: [{ message: { content } }] });
   };
   t.after(() => { globalThis.fetch = originalFetch; });
@@ -217,6 +254,8 @@ test('aiParseItems 模拟 AI 成功、坏 JSON、空结果和服务失败均返�
   assert.equal(success.source, 'ai');
   assert.equal(success.items.length, 8);
   assert.ok(success.items.every(({ owner }) => owner === 'C'));
+  assert.equal((await ai.aiParseItems(acceptanceText, { owner: 'C' })).source, 'ai');
+  assert.equal(textCalls.get(acceptanceText), 1);
 
   for (const marker of ['非法结果测试', '空结果测试', '服务失败测试']) {
     const result = await ai.aiParseItems(`台灯，${marker}`, { owner: 'B' });
@@ -225,6 +264,13 @@ test('aiParseItems 模拟 AI 成功、坏 JSON、空结果和服务失败均返�
     assert.ok(result.items.every(({ owner }) => owner === 'B'));
     assert.ok(result.warnings.includes('AI 离线，已使用本地解析'));
     if (marker === '非法结果测试') assert.ok(result.warnings.includes('BAD_JSON'));
+    if (marker !== '服务失败测试') {
+      const retry = await ai.aiParseItems(`台灯，${marker}`, { owner: 'B' });
+      assert.equal(retry.source, 'ai', marker);
+      assert.equal(textCalls.get(`台灯，${marker}`), 2);
+      assert.equal((await ai.aiParseItems(`台灯，${marker}`, { owner: 'B' })).source, 'ai');
+      assert.equal(textCalls.get(`台灯，${marker}`), 2);
+    }
   }
   assert.equal(calls.filter((url) => url === '/ai/__config').length, 1);
 });

@@ -1,4 +1,4 @@
-import { chat, getConfig } from './client.js';
+import { chat, forgetChat, getConfig } from './client.js';
 import { parseItemsText } from '../planner/index.js';
 import { makeItemMessages, PHOTO_SYSTEM_PROMPT } from './prompts.js';
 import { normalizeItems } from './normalize.js';
@@ -38,13 +38,19 @@ export async function aiAvailable() {
 export async function aiParseItems(text, options = {}) {
   const owner = itemOwner(options);
   const input = typeof text === 'string' ? text : '';
+  let messages;
   try {
     if (!input.trim() || !await aiAvailable()) return rules(input, owner, 'DISABLED');
-    const raw = await chat(makeItemMessages(input));
+    messages = makeItemMessages(input);
+    const raw = await chat(messages);
     const { items, warnings } = normalizeItems(raw, { owner, text: input });
-    if (!items.length) return rules(input, owner, 'EMPTY_RESULT');
+    if (!items.length) {
+      forgetChat(messages);
+      return rules(input, owner, 'EMPTY_RESULT');
+    }
     return { items, source: 'ai', warnings };
   } catch (error) {
+    if (error?.code === 'BAD_JSON' && messages) forgetChat(messages);
     return rules(input, owner, error?.code);
   }
 }
