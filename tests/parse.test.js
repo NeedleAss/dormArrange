@@ -70,7 +70,7 @@ test('功率：瓦与 W', () => {
 
 test('PRESETS.freshman 解析结果稳定且数量正确', () => {
   const a = parseItemsText(PRESETS.freshman);
-  assert.equal(a.length, 30);
+  assert.equal(a.length, 34);   // 演示精简版（assets/item-lists/freshman.txt）解析出 34 件
   assert.equal(JSON.stringify(a), JSON.stringify(parseItemsText(PRESETS.freshman)));
   assert.ok(a.some((it) => it.libId === 'guitar'));
   assert.ok(a.some((it) => it.libId === 'box-l' && it.sizeSource === 'unknown'));
